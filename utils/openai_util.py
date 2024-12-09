@@ -2,11 +2,11 @@ import openai
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-openai.api_key = openai_api_key
-
 def clean_response(input_text):
+    load_dotenv()
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai.api_key = openai_api_key
+
     messages = [
         {"role": "system", "content": "Este é um sistema educativo. Por favor, evite conteúdo ofensivo e inapropriado."},
         {"role": "user", "content": input_text}
