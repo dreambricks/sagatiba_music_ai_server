@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário</title>
+    <style>
+        .container {
+            background-image: url("../../static/balde_background.png");
+            background-repeat: no-repeat;
+            background-size: cover;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 50%;
+            gap: 20px;
+            z-index: 2;
+        }
+
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .custom-checkbox {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: normal!important;
+        }
+
+        .font-bold {
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .send-button {
+            padding: 20px 50px;
+            font-weight: bold;
+            border-radius: 6px;
+            background-color: white;
+            font-size: 16px;
+        }
+
+
+        textarea {
+            resize: none;
+        }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="overlay"></div>
+    <form action="/generate-lyrics" method="post" class="form-container">
+        <div class="input-container">
+            <label class="font-bold" for="phone">Telefone</label>
+            <input type="tel" id="phone" name="phone" required>
+
+            <label class="font-bold" for="destination">Nome do sagalover</label>
+            <input type="text" id="destination" name="destination" required>
+
+            <div class="checkbox-group">
+                <label class="font-bold">Quero convidar</label>
+                <label class="custom-checkbox"><input type="checkbox" name="invite" value="bar">Bar</label>
+                <label class="custom-checkbox"><input type="checkbox" name="invite" value="beber em casa"> Beber em Casa</label>
+                <label class="custom-checkbox"><input type="checkbox" name="invite" value="happy hour"> Happy
+                    Hour</label>
+                <label class="custom-checkbox"><input type="checkbox" name="invite" value="sextou"> Sextou</label>
+            </div>
+
+            <div class="checkbox-group">
+                <label class="font-bold">Vai beber qual dia?</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="segunda"> Segunda</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="terça"> Terça</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="quarta"> Quarta</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="quinta"> Quinta</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="sexta"> Sexta</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="sábado"> Sábado</label>
+                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="domingo"> Domingo</label>
+            </div>
+
+            <label class="font-bold" for="message">Mande seu recado aqui</label>
+            <textarea id="message" name="message" rows="4" required></textarea>
+        </div>
+
+        <button class="send-button" type="submit">Gerar Música</button>
+    </form>
+</div>
+</body>
+</html>
