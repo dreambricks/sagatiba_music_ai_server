@@ -1,11 +1,48 @@
 import openai
-from dotenv import load_dotenv
-import os
+from dotenv import load_dotenv, find_dotenv
+from utils.db_util import load_file_into_set, remove_accent
+import parameters as param
+
+
+_ = load_dotenv(find_dotenv())
+client = openai.OpenAI()
+
+
+def load_black_list():
+    return load_file_into_set(r".\\" + param.BLACK_LIST_FILENAME)
+
+
+def has_black_list_words(black_set, input_string):
+    input_set = set([remove_accent(word) for word in input_string.split()])
+    if black_set & input_set:
+        return True
+
+    return False
+
+
+def load_other_brands():
+    return load_file_into_set(r".\\" + param.OTHER_BRANDS_FILENAME)
+
+
+def has_other_brands(other_brands_set, input_string):
+    no_accent_is = remove_accent(input_string)
+    for brand in other_brands_set:
+        if brand in no_accent_is:
+            return True
+
+    return False
+
+
+black_list = load_black_list()
+other_brands_list = load_other_brands()
+
 
 def moderation_ok(convidado, recado):
-    load_dotenv()
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    openai.api_key = openai_api_key
+    if has_black_list_words(black_list, convidado) or has_black_list_words(black_list, recado):
+        return False
+
+    if has_other_brands(other_brands_list, convidado) or has_other_brands(other_brands_list, recado):
+        return False
 
     prompt = (
         f"Poderia informar se o texto a seguir, destacado entre ###, seria aprovado?\n"
@@ -15,7 +52,7 @@ def moderation_ok(convidado, recado):
         f"###"
     )
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "Você é um censor de textos de um jornal sobre bebidas alcóolicas e precisa avaliar se os textos enviados tem algo com conotação negativa, referências políticas, referências religiosas, palavrões e termos pejorativos. O jornal deve passar sempre uma mensagem divertida e alegre e evitar, a todo custo, algo que possa deixar alguém triste. Referências a bebidas alcóolicas são permitidas, desde que não sejam usadas de forma pejorativa."},
@@ -46,7 +83,7 @@ def generate_lyrics(convidado, opcao, dia_semana, recado):
         f"A letra deve ser divertida, criativa e com rima"
     )
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "Você é um criador de letras de músicas."},
