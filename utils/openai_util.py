@@ -2,40 +2,67 @@ import openai
 from dotenv import load_dotenv
 import os
 
-def clean_response(input_text):
+def moderation_ok(convidado, recado):
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai.api_key = openai_api_key
 
-    messages = [
-        {"role": "system", "content": "Este é um sistema educativo. Por favor, evite conteúdo ofensivo e inapropriado."},
-        {"role": "user", "content": input_text}
-    ]
+    prompt = (
+        f"Poderia informar se o texto a seguir, destacado entre ###, seria aprovado?\n"
+        f"Responda apenas S para sim ou N para não.\n"
+        f"###\n"
+        f"{convidado} {recado}\n"
+        f"###"
+    )
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Você é um censor de textos de um jornal sobre bebidas alcóolicas e precisa avaliar se os textos enviados tem algo com conotação negativa, referências políticas, referências religiosas, palavrões e termos pejorativos. O jornal deve passar sempre uma mensagem divertida e alegre e evitar, a todo custo, algo que possa deixar alguém triste. Referências a bebidas alcóolicas são permitidas, desde que não sejam usadas de forma pejorativa."},
+            {"role": "user", "content": prompt}
+        ],
+        response_format={
+            "type": "text"
+        },
+        temperature=0,
+        max_completion_tokens=2048,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+
+    print(prompt)
+    print(response)
+    result = response.choices[0].message.content
+    print(result)
+
+    return result == 'S'
+
+
+def generate_lyrics(convidado, opcao, dia_semana, recado):
+    prompt = (
+        f"Crie a letra de uma música. O convidado é {convidado}, a ocasião é '{opcao}', "
+        f"o dia da semana é {dia_semana} e o recado adicional é: '{recado}'. "
+        f"A letra deve ser divertida, criativa e com rima"
+    )
 
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
-        messages=messages,
-        max_tokens=300
+        messages=[
+            {"role": "system", "content": "Você é um criador de letras de músicas."},
+            {"role": "user", "content": prompt}
+        ],
+        response_format={
+            "type": "text"
+        },
+        max_completion_tokens=2048,
+        temperature=1,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
     )
 
-    generated_text = response.choices[0].message["content"]
+    print(response)
+    lyrics = response.choices[0].message.content
+    return lyrics
 
-    eval_messages = [
-        {"role": "system", "content": "Avalie se a resposta anterior contém linguagem ofensiva, inapropriada ou com assuntos relacionados à política ou religião."},
-        {"role": "user", "content": generated_text}
-    ]
-
-    eval_response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=eval_messages,
-        max_tokens=300
-    )
-
-    eval_content = eval_response.choices[0].message["content"].lower()
-    if "não" in eval_content or "nenhuma" in eval_content:
-        return "OK"
-    else:
-        return "PROIBIDO"
-
-user_input = "Exemplo de entrada em que catolicismo é ruim"
-print(clean_response(user_input))
