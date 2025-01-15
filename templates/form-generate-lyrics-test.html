@@ -39,6 +39,7 @@
 
         .input-container {
             display: flex;
+            width: 80%;
             flex-direction: column;
             gap: 20px;
         }
@@ -62,52 +63,108 @@
             border-radius: 6px;
             background-color: white;
             font-size: 16px;
+            cursor: pointer;
+            position: relative;
         }
 
-
-        textarea {
-            resize: none;
+        .spinner {
+            display: none;
+            border: 4px solid rgba(0, 0, 0, 0.6);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
         }
 
+        .button-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input, select {
+            padding: 6px 0px;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="overlay"></div>
-    <form action="/generate-lyrics" method="post" class="form-container">
+    <form action="/" method="post" class="form-container">
         <div class="input-container">
-            <label class="font-bold" for="phone">Telefone</label>
-            <input type="tel" id="phone" name="phone" required>
-
             <label class="font-bold" for="destination">Nome do sagalover</label>
-            <input type="text" id="destination" name="destination" required>
+            <input type="text" id="destination" name="destination" required oninput="validateTextInput(this)">
 
-            <div class="checkbox-group">
-                <label class="font-bold">Quero convidar</label>
-                <label class="custom-checkbox"><input type="checkbox" name="invite" value="bar">Bar</label>
-                <label class="custom-checkbox"><input type="checkbox" name="invite" value="beber em casa"> Beber em Casa</label>
-                <label class="custom-checkbox"><input type="checkbox" name="invite" value="happy hour"> Happy
-                    Hour</label>
-                <label class="custom-checkbox"><input type="checkbox" name="invite" value="sextou"> Sextou</label>
-            </div>
+            <label class="font-bold" for="invite_options">Quero convidar</label>
+            <select id="invite_options" name="invite_options" required onchange="handleInviteChange()">
+                <option value="bar">Bar</option>
+                <option value="beber em casa">Beber em Casa</option>
+                <option value="happy hour">Happy Hour</option>
+                <option value="sextou">Sextou</option>
+            </select>
 
-            <div class="checkbox-group">
-                <label class="font-bold">Vai beber qual dia?</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="segunda"> Segunda</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="terça"> Terça</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="quarta"> Quarta</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="quinta"> Quinta</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="sexta"> Sexta</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="sábado"> Sábado</label>
-                <label class="custom-checkbox"><input type="checkbox" name="weekday" value="domingo"> Domingo</label>
-            </div>
+            <label class="font-bold" for="weekdays">Vai beber qual dia?</label>
+            <select id="weekdays" name="weekdays" required>
+                <option value="segunda">Segunda</option>
+                <option value="terça">Terça</option>
+                <option value="quarta">Quarta</option>
+                <option value="quinta">Quinta</option>
+                <option value="sexta">Sexta</option>
+                <option value="sábado">Sábado</option>
+                <option value="domingo">Domingo</option>
+            </select>
 
             <label class="font-bold" for="message">Mande seu recado aqui</label>
-            <textarea id="message" name="message" rows="4" required></textarea>
+            <textarea id="message" name="message" rows="4" required oninput="validateTextInput(this)"></textarea>
         </div>
 
-        <button class="send-button" type="submit">Gerar Música</button>
+        <div class="button-container">
+            <button class="send-button" id="submitButton" onclick="showSpinnerAndRedirect()">Gerar Música</button>
+            <div class="spinner" id="spinner"></div>
+        </div>
     </form>
 </div>
+
+<script>
+    function handleInviteChange() {
+        const inviteOptions = document.getElementById('invite_options');
+        const weekdays = document.getElementById('weekdays');
+
+        if (inviteOptions.value === 'sextou') {
+            weekdays.value = 'sexta'; // Automatically select Friday
+            for (const option of weekdays.options) {
+                option.disabled = option.value !== 'sexta'; // Disable all other options
+            }
+        } else {
+            for (const option of weekdays.options) {
+                option.disabled = false; // Enable all options
+            }
+        }
+    }
+
+    function showSpinnerAndRedirect() {
+        const button = document.getElementById('submitButton');
+        const spinner = document.getElementById('spinner');
+
+        // Hide the button and show the spinner
+        button.style.display = 'none';
+        spinner.style.display = 'block';
+    }
+
+    function validateTextInput(input) {
+        input.value = input.value.replace(/[^a-zA-Z\u00C0-\u017F\s]/g, '');
+    }
+</script>
 </body>
 </html>

@@ -14,7 +14,7 @@ def alive():
     return "alive"
 
 
-@app.route("/generate-lyrics", methods=["GET", "POST"])
+@app.route("/", methods=["GET", "POST"])
 def generate_lyrics_page():
     if request.method == "POST":
 
