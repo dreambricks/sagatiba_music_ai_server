@@ -77,10 +77,22 @@ def moderation_ok(convidado, recado):
 
 
 def generate_lyrics(convidado, opcao, dia_semana, recado):
+    print(opcao)
+
+    if opcao == "bar":
+        opcao = "beber cachaça sagatiba no bar"
+    elif opcao == "beber em casa":
+        opcao = "beber cachaça sagatiba em casa"
+    elif opcao == "happy hour":
+        opcao = "happy hour com cachaça sagatiba"
+    elif opcao == "sextou":
+        opcao = "sextou com cachaça sagatiba"
+
     prompt = (
         f"Crie a letra de uma música. O convidado é {convidado}, a ocasião é '{opcao}', "
         f"o dia da semana é {dia_semana} e o recado adicional é: '{recado}'. "
-        f"A letra deve ser divertida, criativa e com rima"
+        f"A letra deve ser divertida, criativa e com rima."
+        f"A letra deve conter no máximo um verso."
     )
 
     response = client.chat.completions.create(
@@ -99,6 +111,7 @@ def generate_lyrics(convidado, opcao, dia_semana, recado):
         presence_penalty=0
     )
 
+    print(prompt)
     print(response)
     lyrics = response.choices[0].message.content
     return lyrics
