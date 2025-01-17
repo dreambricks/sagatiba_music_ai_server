@@ -20,14 +20,19 @@ def get_task_id(json_string):
 
 def get_audio_url(json_string):
     try:
-        # Parse the JSON string into a Python dictionary
         data = json.loads(json_string)
 
-        # Extract the list of audio URLs from the data
         audio_urls = [item.get("audio_url") for item in data.get("data", [])]
         print(audio_urls)
 
-        return audio_urls[0]
+        if audio_urls and audio_urls[0]:
+            return audio_urls[0]
+
+    except json.JSONDecodeError:
+        # Handle the case where the input is not a valid JSON string
+        print("Invalid JSON string")
+        return None
+
     except json.JSONDecodeError:
         # Handle the case where the input is not a valid JSON string
         print("Invalid JSON string")

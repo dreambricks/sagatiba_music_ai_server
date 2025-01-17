@@ -81,6 +81,144 @@
     <a href="/">
         <button class="back-bt">↩ Voltar</button>
     </a>
+    <button class="back-bt" id="downloadButton" onclick="downloadAudio()">
+        <span id="spinner" style="display:none;">⏳</span> Gerando audio...
+    </button>
 </div>
+<script>
+
+    let audioUrl = '';
+
+    document.addEventListener("DOMContentLoaded", async function() {
+        const task_id = await callGenerateTaskId();
+        console.log(task_id);
+        if (task_id) {
+            fetchAudioUrl(task_id); // Chama o endpoint para obter o áudio
+        }
+    });
+
+    async function callGenerateTaskId() {
+        const lyrics = getQueryParameter("lyrics");  // Obtém a letra da música da URL
+
+        if (lyrics) {
+            const url = `/generate_task_id?lyrics=${encodeURIComponent(lyrics)}`;
+            try {
+                const response = await fetch(url);
+                const taskId = await response.text();  // Espera o task_id como texto
+
+                console.log("Task ID gerado:", taskId);
+                return taskId;  // Retorna o task_id para usar na busca do áudio
+            } catch (error) {
+                console.error("Erro ao chamar o endpoint:", error);
+                return null;
+            }
+        } else {
+            console.error("Parâmetro 'lyrics' não encontrado na URL.");
+            return null;
+        }
+    }
+
+    function getQueryParameter(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);  // Obtém o valor do parâmetro da URL
+    }
+
+    async function fetchAudioUrl(task_id) {
+        const downloadButton = document.getElementById("downloadButton");
+        const spinner = document.getElementById("spinner");
+
+        while (true) {
+            try {
+                const response = await fetch(`/create_music_audio?task_id=${task_id}`);
+                if (response.status !== 500) {
+                    const audioUrlResponse = await response.text();
+                    if (audioUrlResponse && audioUrlResponse.trim() !== '') {
+                        console.log("Audio URL recebido:", audioUrlResponse);
+                        audioUrl = audioUrlResponse;  // Armazena a URL do áudio gerado
+                        downloadButton.innerHTML = "Baixar";
+                        downloadButton.disabled = false;
+                        spinner.style.display = "none";  // Esconde o spinner
+                        return;
+                    } else {
+                        console.log("Retorno inválido ou vazio, tentando novamente...");
+                    }
+                } else {
+                    console.error("Aguardando criação do áudio");
+                    // Enquanto o áudio está sendo gerado, ativa o spinner
+                    downloadButton.innerHTML = "<span id='spinner'>⏳</span> Gerando audio...";
+                    downloadButton.disabled = true;
+                    spinner.style.display = "inline-block";  // Exibe o spinner
+                }
+            } catch (error) {
+                console.error("Erro ao obter o audio_url, tentando novamente...", error);
+            }
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+    }
+
+    async function downloadAudio() {
+        const downloadButton = document.getElementById("downloadButton");
+        const spinner = document.getElementById("spinner");
+
+        // Verifica se o áudio já foi gerado
+        if (!audioUrl || audioUrl.trim() === '') {
+            console.error("A URL do áudio não foi gerada corretamente.");
+            return;
+        }
+
+        // Verifica se o spinner existe antes de tentar acessá-lo
+        if (spinner) {
+            // Ativa o spinner e desativa o texto do botão enquanto o áudio está sendo baixado
+            downloadButton.disabled = true;
+            spinner.style.display = "inline-block"; // Exibe o spinner
+            downloadButton.innerHTML = "<span id='spinner'>⏳</span> Baixando...";  // Altera o texto do botão
+        }
+
+        try {
+            const response = await fetch(`/download_audio?audio_url=${encodeURIComponent(audioUrl)}`);
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const downloadUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                let numero = Math.floor(Math.random() * 100000);
+                let dataAtual = new Date();
+                let dataFormatada = dataAtual.toISOString().replace(/T/, ' ').replace(/:/g, '').replace(/\..+/, '').replace(/ /g, '').substring(0, 14);
+                let resultName = `${numero}_${dataFormatada}`;
+                let fileName = `${resultName}.mp3`;
+
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                // Após o download, desativa o spinner e volta o botão ao normal
+                if (spinner) {
+                    downloadButton.innerHTML = "Baixar";  // Restaura o texto do botão
+                    downloadButton.disabled = false;  // Habilita o botão novamente
+                    spinner.style.display = "none";  // Esconde o spinner
+                }
+            } else {
+                console.error("Erro ao fazer o download do áudio:", response.statusText);
+                // Em caso de erro, restabelece o estado do botão
+                if (spinner) {
+                    downloadButton.innerHTML = "Baixar";
+                    downloadButton.disabled = false;
+                    spinner.style.display = "none";
+                }
+            }
+        } catch (error) {
+            console.error("Erro na requisição:", error);
+            // Em caso de erro, restabelece o estado do botão
+            if (spinner) {
+                downloadButton.innerHTML = "Baixar";
+                downloadButton.disabled = false;
+                spinner.style.display = "none";
+            }
+        }
+    }
+</script>
 </body>
 </html>
