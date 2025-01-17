@@ -1,7 +1,13 @@
 import logging
-from flask import Flask, request, render_template
+from time import sleep
 
+from flask import Flask, request, render_template, url_for
+from werkzeug.utils import redirect
+
+from utils.musicapi_util import create_music, get_music
 from utils.openai_util import moderation_ok, generate_lyrics
+
+import threading
 
 # Configuração de logging
 logging.basicConfig(
@@ -36,21 +42,48 @@ def generate_lyrics_page():
                     f"weekdays={weekdays}, message={message}")
 
         if moderation_ok(destination, message):
-            # Gerando letras
+
             lyrics = generate_lyrics(destination, invite_options, weekdays, message)
             logger.info(f"Letras geradas: {lyrics}")
-            return render_template("lyrics-generated-test.html", message=lyrics)
+            return redirect(url_for('lyrics_page', lyrics=lyrics))
         else:
             # Mensagem para conteúdo não permitido
-            formatted_lyrics = """
+            blocked_message = """
 Seu texto contém referências pejorativas, políticas ou religiosas.
 Por favor, envie outro texto sem essas referências.
            """
             logger.warning("Texto bloqueado por violar as regras de moderação.")
-            return render_template("lyrics-generated-test.html", message=formatted_lyrics)
+            return render_template("lyrics-generated-test.html", lyrics=blocked_message)
 
     logger.info("Renderizando formulário para geração de letras.")
     return render_template("form-generate-lyrics-test.html")
+
+@app.route("/lyrics_page", methods=["GET", "POST"])
+def lyrics_page():
+    lyrics = request.args.get('lyrics')
+
+    thread = threading.Thread(target=create_music_audio, args=(lyrics,))
+    thread.start()
+
+    return render_template("lyrics-generated-test.html", lyrics=lyrics)
+
+def create_music_audio(lyrics):
+    print("Creating Music...")
+    task_id = create_music(lyrics)
+    print(f"Music created with task_id: {task_id}")
+    while True:
+        print("Waiting...")
+        for i in range(10):
+            print(i)
+            sleep(1)
+        try:
+            audio_url = get_music(task_id)
+            if audio_url:
+                print(f"Audio URL: {audio_url}")
+                break
+        except:
+            pass
+    return audio_url
 
 
 if __name__ == "__main__":

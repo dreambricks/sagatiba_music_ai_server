@@ -41,6 +41,7 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
+            gap: 20px;
         }
 
         .card {
@@ -54,14 +55,32 @@
             overflow: auto;
             gap:10px;
         }
+
+        .back-bt{
+            border-radius: 6px;
+            padding: 20px 30px;
+            border: none;
+            background-color: white;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .back-bt:hover {
+            background-color: #dddddd;
+        }
+
     </style>
 </head>
 <body>
 <div class="container">
     <div class="overlay"></div>
     <div class="card">
-        <pre>{{message}}</pre>
+        <pre>{{lyrics}}</pre>
     </div>
+    <a href="/">
+        <button class="back-bt">↩ Voltar</button>
+    </a>
 </div>
 </body>
 </html>

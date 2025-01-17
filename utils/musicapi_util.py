@@ -34,12 +34,12 @@ def get_audio_url(json_string):
         return None
 
 
-def create_music(title, lyrics):
+def create_music(lyrics):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
        "custom_mode": True,
        "prompt": lyrics,
-       "title": title,
+
        "tags": "sertanejo with female voice maiara e maraisa style",
        "gpt_description_prompt": "",
        "make_instrumental": False,
@@ -132,7 +132,7 @@ Essa noite é nossa, a melhor era!
     """
 
     print("Creating Music")
-    task_id = create_music(title, lyrics)
+    task_id = create_music(lyrics)
     print(f"Music created with task_id: {task_id}")
     while True:
         print("Waiting...")
