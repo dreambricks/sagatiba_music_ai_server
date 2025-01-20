@@ -85,6 +85,16 @@
 </div>
 <script>
     let audioUrl = '';
+    let downloadMessages = [
+        "Coletando dados...",
+        "Pausa para uma Sagatiba...",
+        "Aprendendo estilo musical...",
+        "Refinando os acordes...",
+        "Carregando inspiração...",
+        "Ajustando o tom perfeito...",
+        "Criando harmonia mágica..."
+    ];
+    let messageIndex = 0;
 
     document.addEventListener("DOMContentLoaded", async function () {
         const task_id = await callGenerateTaskId();
@@ -92,7 +102,18 @@
         if (task_id) {
             fetchAudioUrl(task_id); // Chama o endpoint para obter o áudio
         }
+        startDownloadMessages(); // Inicia a troca de mensagens dentro do botão
     });
+
+    function startDownloadMessages() {
+        const downloadButton = document.getElementById("downloadButton");
+        setInterval(() => {
+            if (downloadButton.disabled) { // Somente troca mensagens enquanto o botão está desativado
+                downloadButton.innerHTML = `<span id="spinner" style="display:inline-block;">⏳</span> ${downloadMessages[messageIndex]}`;
+                messageIndex = (messageIndex + 1) % downloadMessages.length; // Alterna entre as mensagens
+            }
+        }, 3000); // Muda a mensagem a cada 3 segundos
+    }
 
     async function callGenerateTaskId() {
         const lyrics = getQueryParameter("lyrics");  // Obtém a letra da música da URL
@@ -122,7 +143,6 @@
 
     async function fetchAudioUrl(task_id) {
         const downloadButton = document.getElementById("downloadButton");
-        const spinner = document.getElementById("spinner");
 
         while (true) {
             try {
@@ -140,9 +160,7 @@
                     }
                 } else {
                     console.error("Aguardando criação do áudio");
-                    downloadButton.innerHTML = "<span id='spinner'>⏳</span> Gerando audio...";
                     downloadButton.disabled = true;
-                    spinner.style.display = "inline-block";  // Exibe o spinner
                 }
             } catch (error) {
                 console.error("Erro ao obter o audio_url, tentando novamente...", error);
@@ -153,7 +171,6 @@
 
     async function downloadAudio() {
         const downloadButton = document.getElementById("downloadButton");
-        const spinner = document.getElementById("spinner");
 
         if (!downloadButton) {
             console.error("Elemento 'downloadButton' não encontrado no DOM.");
