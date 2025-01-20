@@ -39,19 +39,17 @@ def get_audio_url(json_string):
         return None
 
 
-def create_music(lyrics):
+def create_music1(lyrics):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
-       "custom_mode": True,
-       "prompt": lyrics,
-
-       "tags": "sertanejo with female voice maiara e maraisa style",
-       "gpt_description_prompt": "",
-       "make_instrumental": False,
-       "mv": "sonic-v3-5"
+        "custom_mode": True,
+        "prompt": lyrics,
+        "tags": "sertanejo, country, female voice, maiara e maraisa style",
+        "make_instrumental": False,
+        "mv": "sonic-v3-5"
     })
     headers = {
-       'Content-Type': 'application/json',
+        'Content-Type': 'application/json',
         'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
     }
 
@@ -61,6 +59,53 @@ def create_music(lyrics):
     result = data.decode("utf-8")
     print(result)
     return get_task_id(result)
+
+
+def create_persona():
+    conn = http.client.HTTPSConnection("api.musicapi.ai")
+    payload = json.dumps({
+        "name": "MM01",
+        "description": "sertanejo, country, female voice, maiara e maraisa style",
+        "continue_clip_id": "838d8482-10fe-475b-8ae4-cae5eea5c98e"
+    })
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
+    }
+    conn.request("POST", "/api/v1/sonic/persona", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+    print(data.decode("utf-8"))
+
+
+def create_music2(lyrics):
+    conn = http.client.HTTPSConnection("api.musicapi.ai")
+    payload = json.dumps({
+        "task_type": "persona_music",
+        "custom_mode": True,
+        "prompt": lyrics,
+        "tags": "country style, with strong female voice, joyfully, uplifting",
+        "persona_id": "804f9d62-bef4-436d-813d-48fc54847e8e",  # generated in the API
+        # "persona_id": "6e2bf4db-6ba5-408a-aa5e-9eb1fc1641f1", # generated in SUNO
+        "continue_clip_id": "838d8482-10fe-475b-8ae4-cae5eea5c98e",
+        "mv": "sonic-v3-5"
+    })
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
+    }
+
+    conn.request("POST", "/api/v1/sonic/create", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+    result = data.decode("utf-8")
+    print(result)
+    return get_task_id(result)
+
+
+def create_music(lyrics):
+    # return create_music01(lyrics) # no persona
+    return create_music2(lyrics) # with persona
 
 
 def get_music(task_id):
@@ -82,6 +127,9 @@ def get_music(task_id):
 
 
 if __name__ == "__main__":
+    create_persona()
+
+if __name__ == "__main__1":
     task_id = 'd5284f49-6fb2-4684-bbed-24aac0807dfe'
     title = "Teste quinta feira com o zé"
     lyrics = """

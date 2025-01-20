@@ -160,65 +160,65 @@
         const downloadButton = document.getElementById("downloadButton");
         const spinner = document.getElementById("spinner");
 
-        // Verifica se o áudio já foi gerado
         if (!audioUrl || audioUrl.trim() === '') {
             console.error("A URL do áudio não foi gerada corretamente.");
             return;
         }
 
-        // Verifica se o spinner existe antes de tentar acessá-lo
+        // Exibe o spinner e desativa o botão
+        downloadButton.disabled = true;
         if (spinner) {
-            // Ativa o spinner e desativa o texto do botão enquanto o áudio está sendo baixado
-            downloadButton.disabled = true;
-            spinner.style.display = "inline-block"; // Exibe o spinner
-            downloadButton.innerHTML = "<span id='spinner'>⏳</span> Baixando...";  // Altera o texto do botão
+            spinner.style.display = "inline-block";
         }
+        downloadButton.innerHTML = `<span id="spinner" style="display:inline-block;">⏳</span> Baixando...`;
 
         try {
-            const response = await fetch(`/download_audio?audio_url=${encodeURIComponent(audioUrl)}`);
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const downloadUrl = URL.createObjectURL(blob);
-
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                let numero = Math.floor(Math.random() * 100000);
-                let dataAtual = new Date();
-                let dataFormatada = dataAtual.toISOString().replace(/T/, ' ').replace(/:/g, '').replace(/\..+/, '').replace(/ /g, '').substring(0, 14);
-                let resultName = `${numero}_${dataFormatada}`;
-                let fileName = `${resultName}.mp3`;
-
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-
-                // Após o download, desativa o spinner e volta o botão ao normal
-                if (spinner) {
-                    downloadButton.innerHTML = "Baixar";  // Restaura o texto do botão
-                    downloadButton.disabled = false;  // Habilita o botão novamente
-                    spinner.style.display = "none";  // Esconde o spinner
-                }
-            } else {
-                console.error("Erro ao fazer o download do áudio:", response.statusText);
-                // Em caso de erro, restabelece o estado do botão
-                if (spinner) {
-                    downloadButton.innerHTML = "Baixar";
-                    downloadButton.disabled = false;
-                    spinner.style.display = "none";
-                }
+            // Baixa o arquivo usando fetch
+            const response = await fetch(audioUrl);
+            if (!response.ok) {
+                throw new Error(`Erro ao baixar o áudio: ${response.statusText}`);
             }
-        } catch (error) {
-            console.error("Erro na requisição:", error);
-            // Em caso de erro, restabelece o estado do botão
+
+            // Converte a resposta em um blob
+            const blob = await response.blob();
+
+            // Cria um link de download para o blob
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = downloadUrl;
+
+            // Nome do arquivo
+            const dataAtual = new Date();
+            const dataFormatada = dataAtual.toISOString().replace(/[-:T]/g, '').split('.')[0];
+            const numero = Math.floor(Math.random() * 100000);
+            const fileName = `${numero}_${dataFormatada}.mp3`;
+
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            // Libera a URL do blob para evitar vazamento de memória
+            URL.revokeObjectURL(downloadUrl);
+
+            // Restaura o botão e esconde o spinner
+            downloadButton.disabled = false;
             if (spinner) {
-                downloadButton.innerHTML = "Baixar";
-                downloadButton.disabled = false;
                 spinner.style.display = "none";
             }
+            downloadButton.innerHTML = "Baixar";
+        } catch (error) {
+            console.error("Erro ao fazer o download:", error);
+
+            // Em caso de erro, restaura o botão e esconde o spinner
+            downloadButton.disabled = false;
+            if (spinner) {
+                spinner.style.display = "none";
+            }
+            downloadButton.innerHTML = "Baixar";
         }
     }
+
 </script>
 </body>
 </html>
