@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Letra da música</title>
     <style>
-
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -69,7 +68,6 @@
         .back-bt:hover {
             background-color: #dddddd;
         }
-
     </style>
 </head>
 <body>
@@ -81,15 +79,14 @@
     <a href="/">
         <button class="back-bt">↩ Voltar</button>
     </a>
-    <button class="back-bt" id="downloadButton" onclick="downloadAudio()">
-        <span id="spinner" style="display:none;">⏳</span> Gerando audio...
+    <button class="back-bt" id="downloadButton" onclick="downloadAudio()" disabled>
+        <span id="spinner" style="display:inline-block;">⏳</span> Gerando audio...
     </button>
 </div>
 <script>
-
     let audioUrl = '';
 
-    document.addEventListener("DOMContentLoaded", async function() {
+    document.addEventListener("DOMContentLoaded", async function () {
         const task_id = await callGenerateTaskId();
         console.log(task_id);
         if (task_id) {
@@ -135,16 +132,14 @@
                     if (audioUrlResponse && audioUrlResponse.trim() !== '') {
                         console.log("Audio URL recebido:", audioUrlResponse);
                         audioUrl = audioUrlResponse;  // Armazena a URL do áudio gerado
-                        downloadButton.innerHTML = "Baixar";
+                        downloadButton.innerHTML = "<span id='spinner' style='display:none;'>⏳</span> Baixar";
                         downloadButton.disabled = false;
-                        spinner.style.display = "none";  // Esconde o spinner
                         return;
                     } else {
                         console.log("Retorno inválido ou vazio, tentando novamente...");
                     }
                 } else {
                     console.error("Aguardando criação do áudio");
-                    // Enquanto o áudio está sendo gerado, ativa o spinner
                     downloadButton.innerHTML = "<span id='spinner'>⏳</span> Gerando audio...";
                     downloadButton.disabled = true;
                     spinner.style.display = "inline-block";  // Exibe o spinner
@@ -160,65 +155,52 @@
         const downloadButton = document.getElementById("downloadButton");
         const spinner = document.getElementById("spinner");
 
-        if (!audioUrl || audioUrl.trim() === '') {
-            console.error("A URL do áudio não foi gerada corretamente.");
+        if (!downloadButton) {
+            console.error("Elemento 'downloadButton' não encontrado no DOM.");
             return;
         }
 
-        // Exibe o spinner e desativa o botão
-        downloadButton.disabled = true;
-        if (spinner) {
-            spinner.style.display = "inline-block";
+        if (!audioUrl || audioUrl.trim() === '') {
+            console.error("URL do áudio não está disponível ou é inválida.");
+            return;
         }
+
         downloadButton.innerHTML = `<span id="spinner" style="display:inline-block;">⏳</span> Baixando...`;
+        downloadButton.disabled = true;
 
         try {
-            // Baixa o arquivo usando fetch
-            const response = await fetch(audioUrl);
-            if (!response.ok) {
-                throw new Error(`Erro ao baixar o áudio: ${response.statusText}`);
-            }
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', audioUrl, true);
+            xhr.responseType = 'blob';
 
-            // Converte a resposta em um blob
-            const blob = await response.blob();
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    const blob = xhr.response;
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = downloadUrl;
+                    a.download = `audio_${Date.now()}.mp3`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(downloadUrl);
+                    downloadButton.innerHTML = "<span id='spinner' style='display:none;'>⏳</span> Baixar";
+                    downloadButton.disabled = false;
+                } else {
+                    console.error(`Erro ao baixar o áudio. Status: ${xhr.status}`);
+                    downloadButton.disabled = false;
+                }
+            };
 
-            // Cria um link de download para o blob
-            const downloadUrl = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = downloadUrl;
+            xhr.onerror = function () {
+                console.error("Erro ao realizar a requisição.");
+            };
 
-            // Nome do arquivo
-            const dataAtual = new Date();
-            const dataFormatada = dataAtual.toISOString().replace(/[-:T]/g, '').split('.')[0];
-            const numero = Math.floor(Math.random() * 100000);
-            const fileName = `${numero}_${dataFormatada}.mp3`;
-
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-
-            // Libera a URL do blob para evitar vazamento de memória
-            URL.revokeObjectURL(downloadUrl);
-
-            // Restaura o botão e esconde o spinner
-            downloadButton.disabled = false;
-            if (spinner) {
-                spinner.style.display = "none";
-            }
-            downloadButton.innerHTML = "Baixar";
+            xhr.send();
         } catch (error) {
-            console.error("Erro ao fazer o download:", error);
-
-            // Em caso de erro, restaura o botão e esconde o spinner
-            downloadButton.disabled = false;
-            if (spinner) {
-                spinner.style.display = "none";
-            }
-            downloadButton.innerHTML = "Baixar";
+            console.error("Erro ao realizar o download do áudio:", error);
         }
     }
-
 </script>
 </body>
 </html>
