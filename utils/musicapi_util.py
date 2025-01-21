@@ -44,7 +44,7 @@ def create_music1(lyrics):
     payload = json.dumps({
         "custom_mode": True,
         "prompt": lyrics,
-        "tags": "sertanejo, country, female voice, maiara e maraisa style",
+        "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
         "make_instrumental": False,
         "mv": "sonic-v3-5"
     })
@@ -78,13 +78,33 @@ def create_persona():
     print(data.decode("utf-8"))
 
 
+def upload_song():
+    conn = http.client.HTTPSConnection("api.musicapi.ai")
+    payload = json.dumps({
+        #"url": "https://sagatibamusicai.ddns.net:5002/static/MARAISA_01_50s.mp3"
+        #"url": "https://sagatibamusicai.ddns.net:5002/static/karina.mp3"
+        "url": "https://sagatibamusicai.ddns.net:5002/static/narcisista.m4a"
+        #"url": "https://sagatibamusicai.ddns.net:5002/static/mm_medo_bobo_live_50s.mp3"
+        #"url": "https://audio.jukehost.co.uk/Ij5SXdAJKLg4tggS8T1xIH1Z0DuOWq5e.mp3"
+    })
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
+    }
+    conn.request("POST", "/api/v1/sonic/upload", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+    print(data.decode("utf-8"))
+    # {"code": 200, "clip_id": "05722510-0bc9-4e8c-a3cc-1f72277a1752", "message": "success"}
+
+
 def create_music2(lyrics):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         "task_type": "persona_music",
         "custom_mode": True,
         "prompt": lyrics,
-        "tags": "country style, with strong female voice, joyfully, uplifting",
+        "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
         "persona_id": "804f9d62-bef4-436d-813d-48fc54847e8e",  # generated in the API
         # "persona_id": "6e2bf4db-6ba5-408a-aa5e-9eb1fc1641f1", # generated in SUNO
         "continue_clip_id": "838d8482-10fe-475b-8ae4-cae5eea5c98e",
@@ -103,9 +123,37 @@ def create_music2(lyrics):
     return get_task_id(result)
 
 
+def create_music3(lyrics):
+    conn = http.client.HTTPSConnection("api.musicapi.ai")
+    payload = json.dumps({
+       "task_type": "extend_upload_music",
+       "custom_mode": True,
+       "prompt": lyrics,
+       "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
+       #"continue_clip_id": "05722510-0bc9-4e8c-a3cc-1f72277a1752",  # MARAISA_01_50s.mp3
+       "continue_clip_id": "5ba1800f-b498-45d1-a0d6-aa0deac46144",  # narcisista.m4a
+       #"continue_clip_id": "06d4dbf5-34de-4f18-9ece-1dfc433ef9da",  # karina.mp3
+       #"continue_clip_id": "164c7b87-440b-41ac-bd0c-0d6d986d7a54",  # MARAISA_01_50s.mp3
+       #"continue_clip_id": "49d4243c-9c06-4107-a46a-abd250424c58",
+       "continue_at": 20,
+       "mv": "sonic-v4"
+    })
+    headers = {
+       'Content-Type': 'application/json',
+        'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
+    }
+
+    conn.request("POST", "/api/v1/sonic/create", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+    result = data.decode("utf-8")
+    print(result)
+    return get_task_id(result)
+
+
 def create_music(lyrics):
     # return create_music01(lyrics) # no persona
-    return create_music2(lyrics) # with persona
+    return create_music3(lyrics)
 
 
 def get_music(task_id):
@@ -126,63 +174,53 @@ def get_music(task_id):
     return get_audio_url(result)
 
 
-if __name__ == "__main__":
+def test_create_persona():
     create_persona()
 
-if __name__ == "__main__1":
-    task_id = 'd5284f49-6fb2-4684-bbed-24aac0807dfe'
-    title = "Teste quinta feira com o zé"
+
+def test_upload_song():
+    print("uploading song")
+    upload_song()
+
+
+def test_create_song():
+    task_id = '19cc9ebd-f1a2-4346-8211-c86a17697a1a'
+    title = "Sagatiba"
     lyrics = """
-    **Título: Quinta do Zé**  
+[Intro]
+E aí, galera. Bora seguir na saga? 
+Essa música é pra quem faz acontecer. 
+Pra quem é da equipe. 
+E sabe seguir na saga. 
 
-*(Verso 1)*  
-Hoje é quinta, já sei que é você,  
-Zé chegou no bar pra gente se divertir,  
-Garçons correndo, a cerveja a fluir,  
-Cento e cinquenta, vamos nos permitir!  
+[Verse1]
+Então bora? 
+Bora levar Sagatiba pra cada esquina. 
+Pra cada mesa de bar. 
+Pra cada conversa gostosa. 
 
-*(Refrão)*  
-Cento e cinquenta, vem, vamo gastar,  
-Rindo e cantando, não podemos parar,  
-Zé no batuque, anima a galera,  
-Essa noite é nossa, a melhor era!  
+[Chorus]
+Pra quem tá na rua. 
+Pra quem tá na loja. 
+Os donos do show. 
+Pra quem tá na rua. 
+Pra quem tá na loja. 
+Os donos do show. 
 
-*(Verso 2)*  
-Petiscos na mesa, o clima tá bom,  
-Sorrisos e histórias, tudo em seu tom,  
-Os amigos tão juntos, não há o que temer,  
-Zé na cachaça, deixa a tristeza em dobro correr!  
+[Verse2]
+Essa música é pra quem faz sucesso. 
+Pra quem faz Sagatiba brilhar. 
+Pra quem tem Sagatiba no coração. 
+E coloca Sagatiba no copo. 
 
-*(Refrão)*  
-Cento e cinquenta, vem, vamo gastar,  
-Rindo e cantando, não podemos parar,  
-Zé no batuque, anima a galera,  
-Essa noite é nossa, a melhor era!  
-
-*(Ponte)*  
-E quando a luz do bar começa a brilhar,  
-A música toca e a gente quer dançar,  
-Zé me diz: "Amigo, tá tudo bem,  
-Com essa vibe, não queremos mais ninguém!"  
-
-*(Refrão)*  
-Cento e cinquenta, vem, vamo gastar,  
-Rindo e cantando, não podemos parar,  
-Zé no batuque, anima a galera,  
-Essa noite é nossa, a melhor era!  
-
-*(Final)*  
-Então levanta o copo, faz um brinde, vai,  
-Às quintas com Zé, não tem "não" nem "talvez",  
-O céu é o limite, e a noite é você,  
-Hoje é festa, vem, vamos celebrar mais uma vez!  
-
-**Refrão final:**  
-Cento e cinquenta, vem, vamo gastar,  
-Rindo e cantando, não podemos parar,  
-Zé no batuque, anima a galera,  
-Essa noite é nossa, a melhor era!  
-    """
+[Chorus]
+Pra quem tá na rua. 
+Pra quem tá na loja. 
+Os donos do show.
+Pra quem tá na rua. 
+Pra quem tá na loja. 
+Os donos do show. 
+"""
 
     print("Creating Music")
     task_id = create_music(lyrics)
@@ -200,3 +238,8 @@ Essa noite é nossa, a melhor era!
             pass
 
     print(f"download the music from: {audio_url}")
+
+
+if __name__ == "__main__":
+    #test_upload_song()
+    test_create_song()
