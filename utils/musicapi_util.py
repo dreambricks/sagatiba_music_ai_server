@@ -135,7 +135,7 @@ def create_music3(lyrics):
        #"continue_clip_id": "06d4dbf5-34de-4f18-9ece-1dfc433ef9da",  # karina.mp3
        #"continue_clip_id": "164c7b87-440b-41ac-bd0c-0d6d986d7a54",  # MARAISA_01_50s.mp3
        #"continue_clip_id": "49d4243c-9c06-4107-a46a-abd250424c58",
-       "continue_at": 20,
+       "continue_at": 21,
        "mv": "sonic-v4"
     })
     headers = {
