@@ -111,6 +111,7 @@ def generate_task_id():
 def request_audio(json):
     task_id = json.get('task_id')
     phone = session.get('phone')
+    host_url = request.host_url 
     
     if not task_id:
         emit('audio_response', {'error': 'Task ID is required', 'code': 400}, namespace='/')
@@ -124,7 +125,7 @@ def request_audio(json):
     while attempts < 30:
         audio_url = get_music(task_id)
         if audio_url:
-            send_whatsapp_message(audio_url, phone)
+            send_whatsapp_message(audio_url, host_url, phone)
             emit('audio_response', {'audio_url': audio_url}, namespace='/')
             return
         socketio.sleep(10)
