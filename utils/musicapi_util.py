@@ -130,12 +130,8 @@ def create_music3(lyrics):
        "custom_mode": True,
        "prompt": lyrics,
        "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-       #"continue_clip_id": "05722510-0bc9-4e8c-a3cc-1f72277a1752",  # MARAISA_01_50s.mp3
-       "continue_clip_id": "5ba1800f-b498-45d1-a0d6-aa0deac46144",  # narcisista.m4a
-       #"continue_clip_id": "06d4dbf5-34de-4f18-9ece-1dfc433ef9da",  # karina.mp3
-       #"continue_clip_id": "164c7b87-440b-41ac-bd0c-0d6d986d7a54",  # MARAISA_01_50s.mp3
-       #"continue_clip_id": "49d4243c-9c06-4107-a46a-abd250424c58",
-       "continue_at": 21,
+       "continue_clip_id": "b4193d54-c9fe-440d-83c9-ecfb3f1bb6ee",
+       "continue_at": 18,
        "mv": "sonic-v4"
     })
     headers = {

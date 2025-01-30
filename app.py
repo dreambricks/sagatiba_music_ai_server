@@ -5,12 +5,13 @@ import os
 import requests
 import time
 
-from flask import Flask, request, render_template, url_for, jsonify, send_file, redirect
+from flask import Flask, request, render_template, url_for, jsonify, send_file, redirect, session
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 
 from utils.musicapi_util import create_music, get_music
 from utils.openai_util import moderation_ok, generate_lyrics
+from utils.twilio_util import send_whatsapp_message
 
 # Configuração de logging
 logging.basicConfig(
@@ -24,6 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
 socketio = SocketIO(app)
 CORS(app)
 
@@ -45,15 +47,17 @@ def call_generate_lyrics():
     invite_options = request.form.get("invite_options")
     weekdays = request.form.get("weekdays")
     message = request.form.get("message")
+    phone = request.form.get("phone")
 
     logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
                 f"weekdays={weekdays}, message={message}")
 
     if moderation_ok(destination, message):
         lyrics = generate_lyrics(destination, invite_options, weekdays, message)
+        session['phone'] = phone
         logger.info("Lyrics generated successfully.")
         return redirect(url_for('display_lyrics', lyrics=lyrics))
-        #return jsonify({"lyrics": lyrics}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
+        #return jsonify({"lyrics": lyrics; "phone": phone}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
     else:
         logger.warning("Submitted text violates moderation rules.")
         return jsonify({"error": "Content blocked due to inappropriate references."}), 403
@@ -62,6 +66,8 @@ def call_generate_lyrics():
 def display_lyrics():
     """Exibe a página com as letras geradas."""
     lyrics = request.args.get('lyrics')
+    phone = request.args.get('phone') 
+
     return render_template("lyrics-generated-test.html", lyrics=lyrics)
 
 @app.route("/lyrics/submit", methods=["POST"])
@@ -104,14 +110,21 @@ def generate_task_id():
 @socketio.on('request_audio_url')
 def request_audio(json):
     task_id = json.get('task_id')
+    phone = session.get('phone')
+    
     if not task_id:
         emit('audio_response', {'error': 'Task ID is required', 'code': 400}, namespace='/')
+        return
+
+    if not phone:
+        emit('audio_response', {'error': 'Phone number is required', 'code': 400}, namespace='/')
         return
 
     attempts = 0
     while attempts < 30:
         audio_url = get_music(task_id)
         if audio_url:
+            send_whatsapp_message(audio_url, phone)
             emit('audio_response', {'audio_url': audio_url}, namespace='/')
             return
         socketio.sleep(10)

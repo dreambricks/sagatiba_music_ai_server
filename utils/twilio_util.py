@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def send_whatsapp_message(message, destination_number):
+def send_whatsapp_message(url, destination_number):
     try:
         load_dotenv()
         account_sid = os.getenv('TWILIO_ACCOUNT_SID')
@@ -24,7 +24,11 @@ def send_whatsapp_message(message, destination_number):
         formatted_number = format_to_e164(destination_number)
         to_whatsapp_number = f'whatsapp:{formatted_number}'
 
-        client.messages.create(body=message,
+        download_url = f"http://yourserver.com/audio/download?audio_url={url}"
+        
+        message_body = f"Sagalover, sua música está pronta para ser ouvida e compartilhada! \n{download_url}"
+
+        client.messages.create(body=message_body,
                                from_=from_whatsapp_number,
                                to=to_whatsapp_number)
 

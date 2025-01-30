@@ -80,9 +80,10 @@
     <a href="/lyrics/form">
         <button class="back-bt">↩ Voltar</button>
     </a>
-    <button class="back-bt" id="downloadButton" onclick="downloadAudio()" disabled>
+    <button class="back-bt" id="downloadButton" disabled>
         <span id="spinner" style="display:inline-block;">⏳</span> Gerando audio...
     </button>
+    <div id="audioStatus" style="color: red; margin-top: 20px;"></div>
 </div>
 <script>
     let audioUrl = '';
@@ -144,38 +145,28 @@
     }
 
     socket.on('audio_response', function(data) {
-        const downloadButton = document.getElementById("downloadButton");
-        if (data.error) {
-            console.error('Error:', data.error);
-            downloadButton.innerHTML = "Erro ao gerar áudio.";
-        } else if (data.audio_url) {
-            console.log('Audio URL:', data.audio_url);
-            audioUrl = data.audio_url;
-            downloadButton.innerHTML = "Baixar Áudio";
-            downloadButton.disabled = false;
-        }
-    });
+    const downloadButton = document.getElementById("downloadButton");
+    const statusDisplay = document.getElementById("audioStatus");
 
-    function downloadAudio() {
-        if (!audioUrl || audioUrl.trim() === '') {
-            console.error("URL do áudio não está disponível ou é inválida.");
-            return;
-        }
-
-        const downloadButton = document.getElementById("downloadButton");
-        downloadButton.innerHTML = "Baixando...";
-        downloadButton.disabled = true;
-
-        const a = document.createElement("a");
-        a.href = audioUrl;
-        a.download = "download_audio.mp3";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        downloadButton.innerHTML = "Baixar Áudio";
-        downloadButton.disabled = false;
+    if (data.error) {
+        console.error('Error:', data.error);
+        statusDisplay.textContent = "Erro ao gerar áudio: " + data.error; // Mostra o erro no elemento de status
+        downloadButton.style.display = "none"; // Esconde o botão se houver erro
+    } else if (data.audio_url) {
+        console.log('Audio URL:', data.audio_url);
+        downloadButton.innerHTML = "Clique para baixar";
+        downloadButton.onclick = function() {
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `/audio/download?audio_url=${encodeURIComponent(data.audio_url)}`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        };
+        downloadButton.disabled = false; // Habilita o botão
+        statusDisplay.textContent = "Áudio pronto para download!"; // Atualiza o status
     }
+});
+
 </script>
 </body>
 </html>
