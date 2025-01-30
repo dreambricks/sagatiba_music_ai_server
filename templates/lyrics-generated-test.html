@@ -119,29 +119,56 @@
     }
 
     async function callGenerateTaskId() {
-        const lyrics = getQueryParameter("lyrics");  // Obtém a letra da música da URL
+        const lyrics = getQueryParameter("lyrics");
+        if (!lyrics) {
+            console.error("Parâmetro 'lyrics' não encontrado na URL.");
+            return null;
+        }
 
-        if (lyrics) {
-            const url = `/lyrics/generate?lyrics=${encodeURIComponent(lyrics)}`;
-            try {
-                const response = await fetch(url);
-                const taskId = await response.text();  // Espera o task_id como texto
-
-                console.log("Task ID gerado:", taskId);
-                return taskId;  // Retorna o task_id para usar na busca do áudio
-            } catch (error) {
-                console.error("Erro ao chamar o endpoint:", error);
+        const enqueueUrl = `/lyrics/generate?lyrics=${encodeURIComponent(lyrics)}`;
+        try {
+            const enqueueResponse = await fetch(enqueueUrl);
+            if (!enqueueResponse.ok) {
+                console.error("Erro ao enfileirar letras:", await enqueueResponse.json());
                 return null;
             }
-        } else {
-            console.error("Parâmetro 'lyrics' não encontrado na URL.");
+            // Confirma que as letras foram enfileiradas mas não espera um task_id aqui
+            console.log("Lyrics enqueued, awaiting task completion...");
+            return await pollForTaskCompletion();  // Polling para obter o task_id
+        } catch (error) {
+            console.error("Erro ao chamar o endpoint:", error);
             return null;
         }
     }
 
+    async function pollForTaskCompletion() {
+        const processUrl = `/lyrics/process`;  // Endpoint para processar a fila
+        try {
+            while (true) {
+                const processResponse = await fetch(processUrl);
+                const result = await processResponse.json();
+                if (processResponse.ok) {
+                    console.log("Task processed:", result);
+                    return result.task_id;  // Retorna o task_id processado
+                } else if (result.error === "No lyrics in the queue") {
+                    // Continua tentando se a fila estiver vazia
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    continue;
+                } else {
+                    console.error("Error processing task:", result.error);
+                    return null;
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao aguardar a conclusão da tarefa:", error);
+            return null;
+        }
+    }
+
+    // Função para obter parâmetros da URL
     function getQueryParameter(name) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(name);  // Obtém o valor do parâmetro da URL
+        const params = new URLSearchParams(window.location.search);
+        return params.get(name);
     }
 
     socket.on('audio_response', function(data) {

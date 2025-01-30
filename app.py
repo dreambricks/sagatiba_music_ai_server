@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
 redis_url = "redis://localhost:6379"
@@ -97,17 +97,58 @@ def submit_lyrics():
 
 @app.route("/lyrics/generate", methods=["GET"])
 def generate_task_id():
-    """Generate a task ID for the provided lyrics and return as JSON."""
+    """Enfileira a geração de música para as letras fornecidas."""
     lyrics = request.args.get("lyrics")
     if not lyrics:
         return jsonify({"error": "Lyrics parameter is missing"}), 400
 
-    task_id = create_music(lyrics)
-    if task_id:
-        return task_id
-        # return jsonify({"task_id": task_id}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
+    # Enfileira as letras para processamento posterior
+    enqueue_task(lyrics)
+    print("passou aqui 1")
+    return jsonify({"status": "Your task has been enqueued"}), 202
+
+@app.route("/lyrics/process", methods=["GET"])
+def process_music_tasks():
+    """Processa letras enfileiradas para criar música."""
+    lyrics_bytes = dequeue_task()
+    if not lyrics_bytes:
+        return jsonify({"error": "Lyrics not dequeued or missing"}), 400
+    
+    try:
+        # Decodifica os bytes para string UTF-8
+        lyrics = lyrics_bytes.decode('utf-8')
+        print(f"Decoded lyrics: {lyrics}")
+    except UnicodeDecodeError as e:
+        # Lidar com possíveis erros de decodificação
+        return jsonify({"error": "Error decoding lyrics"}), 500
+    
+    print("passou aqui 2")
+    print(f"Type of lyrics: {type(lyrics)}, Lyrics content: {lyrics}")
+    
+    if lyrics:
+        task_id = create_music(lyrics)
+        print("passou aqui 3")
+        if task_id:
+            print("passou aqui 4")
+            return jsonify({"task_id": task_id}), 200
+        else:
+            return jsonify({"error": "Failed to create music task"}), 500
     else:
-        return jsonify({"error": "Failed to create task ID"}), 500
+        return jsonify({"error": "No lyrics in the queue"}), 404
+
+# @app.route("/lyrics/generate", methods=["GET"])
+# def generate_task_id():
+#     """Generate a task ID for the provided lyrics and return as JSON."""
+#     lyrics = request.args.get("lyrics")
+#     if not lyrics:
+#         return jsonify({"error": "Lyrics parameter is missing"}), 400
+
+#     task_id = create_music(lyrics)
+#     if task_id:
+#         return task_id
+#         # return jsonify({"task_id": task_id}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
+#     else:
+#         return jsonify({"error": "Failed to create task ID"}), 500
 
 # @app.route("/lyrics/audio", methods=["GET"])
 # def get_audio():
@@ -181,6 +222,15 @@ def download_audio():
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
         return jsonify({"error": str(e)}), 500
+
+def enqueue_task(lyrics):
+    """ Adiciona uma tarefa à fila FIFO no Redis """
+    print(f"Enqueuing lyrics: {lyrics}")
+    conn.rpush('lyrics_queue', lyrics)
+
+def dequeue_task():
+    """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
+    return conn.lpop('lyrics_queue')
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
