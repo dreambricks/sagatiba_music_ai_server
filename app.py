@@ -4,10 +4,14 @@ import random
 import os
 import requests
 import time
+import redis
 
 from flask import Flask, request, render_template, url_for, jsonify, send_file, redirect, session
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 
 from utils.musicapi_util import create_music, get_music
 from utils.openai_util import moderation_ok, generate_lyrics
@@ -29,6 +33,16 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 socketio = SocketIO(app)
 CORS(app)
 
+redis_url = "redis://localhost:6379"
+conn = redis.from_url(redis_url)
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,  
+    storage_uri=redis_url,
+    storage_options={"socket_connect_timeout": 30}
+)
+
 @app.route('/alive', methods=['GET'])
 def health_check():
     logger.info("Alive check endpoint accessed.")
@@ -41,6 +55,8 @@ def display_lyrics_form():
     return render_template("form-generate-lyrics-test.html")
 
 @app.route("/lyrics", methods=["POST"])
+@limiter.limit("1 per 5 minutes")
+@limiter.limit("10 per day")
 def call_generate_lyrics():
     """Gera letras com base nos dados do formulário e retorna JSON com as letras ou erro."""
     destination = request.form.get("destination")
