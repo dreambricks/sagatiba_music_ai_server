@@ -9,7 +9,7 @@ client = openai.OpenAI()
 
 
 def load_black_list():
-    return load_file_into_set(r".\\" + param.BLACK_LIST_FILENAME)
+    return load_file_into_set(param.BLACK_LIST_FILENAME)
 
 
 def has_black_list_words(black_set, input_string):
@@ -21,7 +21,7 @@ def has_black_list_words(black_set, input_string):
 
 
 def load_other_brands():
-    return load_file_into_set(r".\\" + param.OTHER_BRANDS_FILENAME)
+    return load_file_into_set(param.OTHER_BRANDS_FILENAME)
 
 
 def has_other_brands(other_brands_set, input_string):

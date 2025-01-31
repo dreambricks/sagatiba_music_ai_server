@@ -94,7 +94,7 @@ def call_generate_lyrics():
         return jsonify({"error": "Content blocked due to inappropriate references."}), 403
 
 
-@app.route("/lyrics/generate", methods=["GET"])
+@app.route("/lyrics/generate", methods=["GET", "POST"])
 def generate_task_id():
     """Enfileira a geração de música para as letras fornecidas."""
     data = request.get_json()
@@ -229,9 +229,9 @@ def download_audio():
         logger.error(f"Request failed: {e}")
         return jsonify({"error": str(e)}), 500
 
-def enqueue_task(lyrics):
+def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis """
-    print(f"Enqueuing lyrics: {lyrics}")
+    print(f"Enqueuing lyrics: {lyrics} and {phone}")
     conn.rpush('lyrics_queue', lyrics)
 
 def dequeue_task():
@@ -240,4 +240,4 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    socketio.run(app, host='0.0.0.0', port=5002, debug=True)
+    socketio.run(app, host='0.0.0.0', port=80, allow_unsafe_werkzeug=True)
