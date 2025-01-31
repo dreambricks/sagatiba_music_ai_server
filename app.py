@@ -230,9 +230,10 @@ def download_audio():
         return jsonify({"error": str(e)}), 500
 
 def enqueue_task(lyrics, phone):
-    """ Adiciona uma tarefa à fila FIFO no Redis """
-    print(f"Enqueuing lyrics: {lyrics} and {phone}")
-    conn.rpush('lyrics_queue', lyrics)
+    """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
+    task_data = json.dumps({"lyrics": lyrics, "phone": phone})
+    logger.info(f"Enqueuing task: {task_data}")
+    conn.rpush('lyrics_queue', task_data
 
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
