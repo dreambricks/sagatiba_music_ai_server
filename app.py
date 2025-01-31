@@ -88,7 +88,7 @@ def call_generate_lyrics():
         lyrics = generate_lyrics(destination, invite_options, weekdays, message)
         logger.info("Lyrics generated successfully.")
         #return redirect(url_for('display_lyrics', lyrics=lyrics))
-        return jsonify({"lyrics": lyrics; "phone": phone})
+        return jsonify({"lyrics": lyrics})
     else:
         logger.warning("Submitted text violates moderation rules.")
         return jsonify({"error": "Content blocked due to inappropriate references."}), 403
