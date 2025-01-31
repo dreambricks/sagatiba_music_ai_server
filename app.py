@@ -47,36 +47,12 @@ limiter = Limiter(
 def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
-
 @app.route("/lyrics/form", methods=["GET"])
+
 def display_lyrics_form():
     """Renderiza o formulário para geração de letras."""
     logger.info("Rendering lyrics generation form.")
     return render_template("form-generate-lyrics-test.html")
-
-@app.route("/lyrics", methods=["POST"])
-@limiter.limit("1 per 5 minutes")
-@limiter.limit("10 per day")
-def call_generate_lyrics():
-    """Gera letras com base nos dados do formulário e retorna JSON com as letras ou erro."""
-    destination = request.form.get("destination")
-    invite_options = request.form.get("invite_options")
-    weekdays = request.form.get("weekdays")
-    message = request.form.get("message")
-    phone = request.form.get("phone")
-
-    logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
-                f"weekdays={weekdays}, message={message}")
-
-    if moderation_ok(destination, message):
-        lyrics = generate_lyrics(destination, invite_options, weekdays, message)
-        session['phone'] = phone
-        logger.info("Lyrics generated successfully.")
-        return redirect(url_for('display_lyrics', lyrics=lyrics))
-        #return jsonify({"lyrics": lyrics; "phone": phone}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
-    else:
-        logger.warning("Submitted text violates moderation rules.")
-        return jsonify({"error": "Content blocked due to inappropriate references."}), 403
 
 @app.route("/lyrics/display", methods=["GET"])
 def display_lyrics():
@@ -95,46 +71,77 @@ def submit_lyrics():
     else:
         return render_template("lyrics-generated-test.html", lyrics="Nenhuma letra foi enviada.")
 
+@app.route("/lyrics", methods=["POST"])
+@limiter.limit("1 per 5 minutes")
+@limiter.limit("10 per day")
+def call_generate_lyrics():
+    """Gera letras com base nos dados do formulário e retorna JSON com as letras ou erro."""
+    destination = request.form.get("destination")
+    invite_options = request.form.get("invite_options")
+    weekdays = request.form.get("weekdays")
+    message = request.form.get("message")
+
+    logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
+                f"weekdays={weekdays}, message={message}")
+
+    if moderation_ok(destination, message):
+        lyrics = generate_lyrics(destination, invite_options, weekdays, message)
+        logger.info("Lyrics generated successfully.")
+        #return redirect(url_for('display_lyrics', lyrics=lyrics))
+        return jsonify({"lyrics": lyrics; "phone": phone})
+    else:
+        logger.warning("Submitted text violates moderation rules.")
+        return jsonify({"error": "Content blocked due to inappropriate references."}), 403
+
+
 @app.route("/lyrics/generate", methods=["GET"])
 def generate_task_id():
     """Enfileira a geração de música para as letras fornecidas."""
-    lyrics = request.args.get("lyrics")
+    data = request.get_json()
+    lyrics = data.get("lyrics")
+    phone = data.get("phone")
     if not lyrics:
+        logger.info(f"Task not enqueued for phone: {phone}")
         return jsonify({"error": "Lyrics parameter is missing"}), 400
 
     # Enfileira as letras para processamento posterior
-    enqueue_task(lyrics)
-    print("passou aqui 1")
+    enqueue_task(lyrics, phone)
+    logger.info(f"Task enqueued for phone: {phone}")
     return jsonify({"status": "Your task has been enqueued"}), 202
 
-@app.route("/lyrics/process", methods=["GET"])
+import json
+
+@app.route("/lyrics/process", methods=["POST"])
 def process_music_tasks():
-    """Processa letras enfileiradas para criar música."""
-    lyrics_bytes = dequeue_task()
-    if not lyrics_bytes:
-        return jsonify({"error": "Lyrics not dequeued or missing"}), 400
-    
+    """Processa a próxima tarefa da fila e retorna o task_id se o telefone for o mesmo"""
+    phone = request.json.get("phone")  # O telefone vem no corpo da requisição
+    if not phone:
+        return jsonify({"error": "Phone number is required"}), 400
+
+    raw_task = dequeue_task()  # Retira a primeira tarefa FIFO
+    if not raw_task:
+        return jsonify({"error": "No tasks in the queue"}), 404
+
     try:
-        # Decodifica os bytes para string UTF-8
-        lyrics = lyrics_bytes.decode('utf-8')
-        print(f"Decoded lyrics: {lyrics}")
-    except UnicodeDecodeError as e:
-        # Lidar com possíveis erros de decodificação
-        return jsonify({"error": "Error decoding lyrics"}), 500
-    
-    print("passou aqui 2")
-    print(f"Type of lyrics: {type(lyrics)}, Lyrics content: {lyrics}")
-    
-    if lyrics:
+        task_data = json.loads(raw_task.decode("utf-8"))  
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid task data format"}), 500
+
+    lyrics = task_data["lyrics"]
+    task_phone = task_data["phone"]
+
+    if task_phone == phone:
+        # Se o telefone bate, processamos e retornamos a resposta ao frontend
         task_id = create_music(lyrics)
-        print("passou aqui 3")
         if task_id:
-            print("passou aqui 4")
+            conn.hset("processed_tasks", phone, task_id)  # Salva task_id no Redis
             return jsonify({"task_id": task_id}), 200
         else:
             return jsonify({"error": "Failed to create music task"}), 500
     else:
-        return jsonify({"error": "No lyrics in the queue"}), 404
+        # Se não bate, envia o áudio ao telefone correto e retorna 202 (Aceito, sem resposta imediata)
+        request_audio({"task_id": task_id, "phone": task_phone})
+        return jsonify({"status": "Audio sent to original requester"}), 202
 
 # @app.route("/lyrics/generate", methods=["GET"])
 # def generate_task_id():
@@ -164,31 +171,30 @@ def process_music_tasks():
 #     else:
 #         return jsonify({"error": "Audio generation pending"}), 202
 
-@socketio.on('request_audio_url')
-def request_audio(json):
-    task_id = json.get('task_id')
-    phone = session.get('phone')
-    host_url = request.host_url 
-    
+def request_audio(json_data):
+    """Envia o áudio para o número de telefone correto."""
+    task_id = json_data.get("task_id")
+    phone = json_data.get("phone")  # Agora usa o phone passado no JSON
+    host_url = request.host_url
+
     if not task_id:
-        emit('audio_response', {'error': 'Task ID is required', 'code': 400}, namespace='/')
-        return
+        return jsonify({'error': 'Task ID is required', 'code': 400})
 
     if not phone:
-        emit('audio_response', {'error': 'Phone number is required', 'code': 400}, namespace='/')
-        return
+        return jsonify({'error': 'Phone number is required', 'code': 400})
 
     attempts = 0
     while attempts < 30:
         audio_url = get_music(task_id)
         if audio_url:
             send_whatsapp_message(audio_url, host_url, phone)
-            emit('audio_response', {'audio_url': audio_url}, namespace='/')
-            return
+            return jsonify({'status': 'Audio sent successfully'}), 200
+
         socketio.sleep(10)
         attempts += 1
 
-    emit('audio_response', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
+    return jsonify({'error': 'Failed to generate audio after several attempts', 'code': 500})
+
 
 @app.route("/audio/download", methods=["GET"])
 def download_audio():
