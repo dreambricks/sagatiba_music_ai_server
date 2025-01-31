@@ -80,6 +80,7 @@ def call_generate_lyrics():
     invite_options = request.form.get("invite_options")
     weekdays = request.form.get("weekdays")
     message = request.form.get("message")
+    #phone = request.form.get("phone")
 
     logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
                 f"weekdays={weekdays}, message={message}")
@@ -87,7 +88,7 @@ def call_generate_lyrics():
     if moderation_ok(destination, message):
         lyrics = generate_lyrics(destination, invite_options, weekdays, message)
         logger.info("Lyrics generated successfully.")
-        #return redirect(url_for('display_lyrics', lyrics=lyrics))
+        #return redirect(url_for('display_lyrics', lyrics=lyrics, phonw=phonw))
         return jsonify({"lyrics": lyrics})
     else:
         logger.warning("Submitted text violates moderation rules.")
@@ -233,7 +234,7 @@ def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
     task_data = json.dumps({"lyrics": lyrics, "phone": phone})
     logger.info(f"Enqueuing task: {task_data}")
-    conn.rpush('lyrics_queue', task_data
+    conn.rpush('lyrics_queue', task_data)
 
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """

@@ -119,22 +119,31 @@
     }
 
     async function callGenerateTaskId() {
-        const lyrics = getQueryParameter("lyrics");
-        if (!lyrics) {
-            console.error("Parâmetro 'lyrics' não encontrado na URL.");
+        const lyrics = getQueryParameter("lyrics");  // Obtém as letras da URL
+        const phone = getQueryParameter("phone"); // Função para pegar o telefone do usuário
+
+        if (!lyrics || !phone) {
+            console.error("Parâmetro 'lyrics' ou 'phone' não encontrado.");
             return null;
         }
 
-        const enqueueUrl = `/lyrics/generate?lyrics=${encodeURIComponent(lyrics)}`;
+        const url = "/lyrics/generate";
+        const options = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ lyrics: lyrics, phone: phone }) // Envia JSON
+        };
+
         try {
-            const enqueueResponse = await fetch(enqueueUrl);
-            if (!enqueueResponse.ok) {
-                console.error("Erro ao enfileirar letras:", await enqueueResponse.json());
-                return null;
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                throw new Error(`Erro ao chamar o endpoint: ${response.status}`);
             }
-            // Confirma que as letras foram enfileiradas mas não espera um task_id aqui
-            console.log("Lyrics enqueued, awaiting task completion...");
-            return await pollForTaskCompletion();  // Polling para obter o task_id
+            const data = await response.json();
+            console.log("Lyrics enqueued:", data.status);
+            return data.status;
         } catch (error) {
             console.error("Erro ao chamar o endpoint:", error);
             return null;
