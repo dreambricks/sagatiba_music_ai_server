@@ -127,7 +127,7 @@ def create_music3(lyrics):
         "custom_mode": True,
         "prompt": lyrics,
         "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-        "continue_clip_id": "b4193d54-c9fe-440d-83c9-ecfb3f1bb6ee",
+        "continue_clip_id": "e4ddea3a-93d5-43a1-ad8a-b51d8b547fab",
         "continue_at": 18,
         "mv": "sonic-v4"
     })

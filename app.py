@@ -72,8 +72,8 @@ def submit_lyrics():
         return render_template("lyrics-generated-test.html", lyrics="Nenhuma letra foi enviada.")
 
 @app.route("/lyrics", methods=["POST"])
-@limiter.limit("1 per 5 minutes")
-@limiter.limit("10 per day")
+#@limiter.limit("1 per 5 minutes")
+#@limiter.limit("10 per day")
 def call_generate_lyrics():
     """Gera letras com base nos dados do formulário e retorna JSON com as letras ou erro."""
     destination = request.form.get("destination")
@@ -172,29 +172,43 @@ def process_music_tasks():
 #     else:
 #         return jsonify({"error": "Audio generation pending"}), 202
 
-def request_audio(json_data):
-    """Envia o áudio para o número de telefone correto."""
-    task_id = json_data.get("task_id")
-    phone = json_data.get("phone")  # Agora usa o phone passado no JSON
-    host_url = request.host_url
+@socketio.on('request_audio_url')
+def request_audio(json):
+    """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
+
+    logger.info(f"Recebida requisição de áudio: {json}")  # Log dos dados de entrada
+
+    task_id = json.get('task_id')
+    phone = json.get('phone')  # Obtém o número de telefone da sessão
+    host_url = request.host_url  # Obtém a URL do host para enviar o áudio via WhatsApp
 
     if not task_id:
-        return jsonify({'error': 'Task ID is required', 'code': 400})
+        logger.warning("Requisição sem Task ID")
+        emit('error_message', {'error': 'Task ID is required', 'code': 400}, namespace='/')
+        return
 
     if not phone:
-        return jsonify({'error': 'Phone number is required', 'code': 400})
+        logger.warning("Requisição sem número de telefone na sessão")
+        emit('error_message', {'error': 'Phone number is required', 'code': 400}, namespace='/')
+        return
 
     attempts = 0
     while attempts < 30:
+        logger.info(f"Tentativa {attempts + 1}: buscando áudio para task_id={task_id}")
+        emit('message', {'error': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
+
         audio_url = get_music(task_id)
         if audio_url:
+            logger.info(f"Áudio encontrado: {audio_url}. Enviando para {phone}.")
             send_whatsapp_message(audio_url, host_url, phone)
-            return jsonify({'status': 'Audio sent successfully'}), 200
+            emit('audio_response', {'audio_url': audio_url}, namespace='/')
+            return
 
         socketio.sleep(10)
         attempts += 1
 
-    return jsonify({'error': 'Failed to generate audio after several attempts', 'code': 500})
+    logger.error(f"Falha ao gerar áudio para task_id={task_id} após 30 tentativas")
+    emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
 
 @app.route("/audio/download", methods=["GET"])
@@ -242,4 +256,4 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    socketio.run(app, host='0.0.0.0', port=80, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
