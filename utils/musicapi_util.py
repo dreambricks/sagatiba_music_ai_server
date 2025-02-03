@@ -3,11 +3,8 @@ import json
 from time import sleep
 
 
-def get_task_id(json_string):
+def get_task_id(data):
     try:
-        # Parse the JSON string into a Python dictionary
-        data = json.loads(json_string)
-
         # Extract the task_id value
         task_id = data.get("task_id")
 
@@ -130,7 +127,7 @@ def create_music3(lyrics):
         "custom_mode": True,
         "prompt": lyrics,
         "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-        "continue_clip_id": "e4ddea3a-93d5-43a1-ad8a-b51d8b547fab",
+        "continue_clip_id": "eb7357db-847b-4629-bba6-e76b69631b90",
         "continue_at": 18,
         "mv": "sonic-v4"
     })

@@ -79,14 +79,20 @@ def moderation_ok(convidado, recado):
 def generate_lyrics(convidado, opcao, dia_semana, recado):
     print(opcao)
 
-    if opcao == "bar":
+    if opcao == "BAR":
         opcao = "beber cachaça sagatiba no bar"
-    elif opcao == "beber em casa":
+    elif opcao == "ROLÊ EM CASA":
         opcao = "beber cachaça sagatiba em casa"
-    elif opcao == "happy hour":
+    elif opcao == "HAPPY HOUR":
         opcao = "happy hour com cachaça sagatiba"
-    elif opcao == "sextou":
+    elif opcao == "SEXTOU":
         opcao = "sextou com cachaça sagatiba"
+    elif opcao == "ANIVERSÁRIO":
+        opcao = "aniversário com cachaça sagatiba"
+    elif opcao == "FESTA":
+        opcao = "festa com cachaça sagatiba"
+    elif opcao == "SHOW":
+        opcao = "show com cachaça sagatiba"
 
     prompt = (
         f"Crie a letra de uma música. O convidado é {convidado}, a ocasião é '{opcao}', "
