@@ -3,8 +3,11 @@ import json
 from time import sleep
 
 
-def get_task_id(data):
+def get_task_id(json_string):
     try:
+        # Parse the JSON string into a Python dictionary
+        data = json.loads(json_string)
+
         # Extract the task_id value
         task_id = data.get("task_id")
 
