@@ -92,7 +92,9 @@ def generate_lyrics(convidado, opcao, dia_semana, recado):
         f"Crie a letra de uma música. O convidado é {convidado}, a ocasião é '{opcao}', "
         f"o dia da semana é {dia_semana} e o recado adicional é: '{recado}'. "
         f"A letra deve ser divertida, criativa e com rima."
-        #f"A letra deve conter no máximo um verso."
+        "A letra deve conter exatamente uma introdução, um verso e um refrão."
+        "A letra não pode incentivar o consumo exagerado, compulsivo ou irresponsável de álcool."
+        "A letra não pode sugerir que o consumo de bebidas alcoólicas traz sucesso pessoal, profissional, esportivo, social ou sexual."
     )
 
     response = client.chat.completions.create(
