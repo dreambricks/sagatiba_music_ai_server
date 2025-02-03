@@ -80,9 +80,9 @@ def upload_song():
     payload = json.dumps({
         #"url": "https://sagatibamusicai.ddns.net:5002/static/MARAISA_01_50s.mp3"
         #"url": "https://sagatibamusicai.ddns.net:5002/static/karina.mp3"
-        "url": "https://sagatibamusicai.ddns.net:5002/static/narcisista.m4a"
+        #"url": "https://sagatibamusicai.ddns.net:5002/static/narcisista.m4a"
         #"url": "https://sagatibamusicai.ddns.net:5002/static/mm_medo_bobo_live_50s.mp3"
-        #"url": "https://audio.jukehost.co.uk/Ij5SXdAJKLg4tggS8T1xIH1Z0DuOWq5e.mp3"
+        "url": "https://audio.jukehost.co.uk/Ij5SXdAJKLg4tggS8T1xIH1Z0DuOWq5e.mp3"
     })
     headers = {
         'Content-Type': 'application/json',
@@ -257,5 +257,5 @@ Os donos do show.
 
 
 if __name__ == "__main__":
-    #test_upload_song()
-    test_create_song()
+    test_upload_song()
+    #test_create_song()
