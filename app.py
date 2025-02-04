@@ -1,15 +1,11 @@
 import logging
-from datetime import datetime
-import random
 import os
 import requests
 import time
 import redis
-import zipfile
+import re
 
-from io import BytesIO
-
-from flask import Flask, request, render_template, url_for, jsonify, send_file, redirect, session
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
@@ -17,7 +13,7 @@ from flask_limiter.util import get_remote_address
 
 from utils.musicapi_util import create_music, get_music
 from utils.openai_util import moderation_ok, generate_lyrics
-from utils.twilio_util import send_whatsapp_message, send_whatsapp_download_message
+from utils.twilio_util import send_whatsapp_download_message
 
 # Configuração de logging
 logging.basicConfig(
@@ -49,29 +45,29 @@ limiter = Limiter(
 def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
-@app.route("/lyrics/form", methods=["GET"])
 
-def display_lyrics_form():
-    """Renderiza o formulário para geração de letras."""
-    logger.info("Rendering lyrics generation form.")
-    return render_template("form-generate-lyrics-test.html")
+# @app.route("/lyrics/form", methods=["GET"])
+# def display_lyrics_form():
+#     """Renderiza o formulário para geração de letras."""
+#     logger.info("Rendering lyrics generation form.")
+#     return render_template("form-generate-lyrics-test.html")
 
-@app.route("/lyrics/display", methods=["GET"])
-def display_lyrics():
-    """Exibe a página com as letras geradas."""
-    lyrics = request.args.get('lyrics')
-    phone = request.args.get('phone') 
+# @app.route("/lyrics/display", methods=["GET"])
+# def display_lyrics():
+#     """Exibe a página com as letras geradas."""
+#     lyrics = request.args.get('lyrics')
+#     phone = request.args.get('phone') 
 
-    return render_template("lyrics-generated-test.html", lyrics=lyrics)
+#     return render_template("lyrics-generated-test.html", lyrics=lyrics)
 
-@app.route("/lyrics/submit", methods=["POST"])
-def submit_lyrics():
-    """Recebe as letras via formulário POST e exibe na página de letras."""
-    lyrics = request.form.get('lyrics', '')
-    if lyrics:
-        return render_template("lyrics-generated-test.html", lyrics=lyrics)
-    else:
-        return render_template("lyrics-generated-test.html", lyrics="Nenhuma letra foi enviada.")
+# @app.route("/lyrics/submit", methods=["POST"])
+# def submit_lyrics():
+#     """Recebe as letras via formulário POST e exibe na página de letras."""
+#     lyrics = request.form.get('lyrics', '')
+#     if lyrics:
+#         return render_template("lyrics-generated-test.html", lyrics=lyrics)
+#     else:
+#         return render_template("lyrics-generated-test.html", lyrics="Nenhuma letra foi enviada.")
 
 @app.route("/lyrics", methods=["POST"])
 #@limiter.limit("1 per 5 minutes")
@@ -199,25 +195,13 @@ def request_audio(json):
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
-        audio_urls = get_music(task_id)  # Retorna uma lista de URLs de áudio
-
-        if audio_urls:  # Verifica se há pelo menos uma URL válida
-            logger.info(f"Áudio(s) encontrado(s) para {phone}: {audio_urls}")
-
-            # Criar lista de URLs de download
-            download_urls = [f"{host_url}audio/download?audio_url={url}" for url in audio_urls]
-
-            # Enviar todas as URLs de download para o WhatsApp
-            for download_url in download_urls:
-                send_whatsapp_download_message(download_url, phone)  # Agora envia `download_url` e `phone`
-
-            # Enviar resposta via WebSocket com todas as URLs e as respectivas de download
-            emit('audio_response', {
-                'audio_urls': audio_urls,
-                'download_urls': download_urls
-            }, namespace='/')
-
-            return  # **Sai do loop imediatamente ao encontrar áudio**
+        audio_url = get_music(task_id)
+        file_path = store_audio(audio_url)
+        if audio_url:
+            logger.info(f"Áudio encontrado: {file_path}. Enviando para {phone}.")
+            send_whatsapp_download_message(file_path, host_url, phone)
+            emit('audio_response', {'audio_url': audio_url}, namespace='/')
+            return
 
         socketio.sleep(10)
         attempts += 1
@@ -225,44 +209,96 @@ def request_audio(json):
     logger.error(f"Falha ao gerar áudio para task_id={task_id} após 30 tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
-import zipfile
-from io import BytesIO
-
-@app.route("/audio/download", methods=["POST"])
+@app.route("/audio/download", methods=["GET"])
 def download_audio():
-    """Faz o download de múltiplos arquivos de áudio e retorna um ZIP contendo os arquivos."""
-    data = request.get_json()
-    audio_urls = data.get("audio_urls", [])
+    """Provides a file download for the generated audio."""
+    audio_url = request.args.get('audio_url')
+    if not audio_url:
+        return jsonify({"error": "Audio URL not provided"}), 400
 
-    if not audio_urls or len(audio_urls) == 0:
-        return jsonify({"error": "Audio URLs not provided"}), 400
+    temp_path = store_audio(audio_url)
+    file_name = os.path.basename(temp_path)
+    return send_file(temp_path, as_attachment=True, download_name=file_name, mimetype="audio/mpeg")
+
+# @app.route("/audio/download", methods=["POST"])
+# def download_audio():
+#     """Faz o download de múltiplos arquivos de áudio e retorna um ZIP contendo os arquivos."""
+#     data = request.get_json()
+#     audio_urls = data.get("audio_urls", [])
+
+#     if not audio_urls or len(audio_urls) == 0:
+#         return jsonify({"error": "Audio URLs not provided"}), 400
+
+#     try:
+
+#         # Criar buffer de memória para o ZIP
+#         zip_buffer = BytesIO()
+
+#         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+#             for index, audio_url in enumerate(audio_urls):
+#                 try:
+#                     response = requests.get(audio_url, stream=True)
+#                     if response.status_code != 200:
+#                         return jsonify({"error": f"Failed to download file from {audio_url}"}), 500
+
+#                     file_name = f"audio_{index+1}.mp3"
+                    
+#                     # Escrever diretamente no ZIP
+#                     zipf.writestr(file_name, response.content)
+
+#                 except requests.exceptions.RequestException as e:
+#                     logger.error(f"Request failed: {e}")
+#                     return jsonify({"error": str(e)}), 500
+
+#         # Garantir que o buffer está no início antes de enviar
+#         zip_buffer.seek(0)
+
+#         return send_file(zip_buffer, as_attachment=True, download_name="audio_files.zip", mimetype="application/zip")
+
+#     except requests.exceptions.RequestException as e:
+#         logger.error(f"Request failed: {e}")
+#         return jsonify({"error": str(e)}), 500
+
+def get_task_id_from_url(url):
+    """
+    Extracts the task_id from a given URL.
+    
+    Supported formats:
+    - 'https://audiopipe.suno.ai/?item_id=<task_id>'
+    - 'https://cdn1.suno.ai/<task_id>.mp3'
+    """
+    pattern = re.compile(r'([a-f0-9-]{36})')  # Matches UUID-like patterns
+    match = pattern.search(url)
+    return match.group(1) if match else None
+
+
+def store_audio(url, max_size=1177*1024):
+
+    tmp_dir = 'static/mp3/'
+    task_id = get_task_id_from_url(url)
+    file_name = f"sagatiba_{task_id}.mp3"
+    temp_path = os.path.join(tmp_dir, file_name)
+
+    if not os.path.exists(tmp_dir):
+        os.makedirs(tmp_dir)
 
     try:
+        response = requests.get(url, stream=True)
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to download file"}), 500
 
-        # Criar buffer de memória para o ZIP
-        zip_buffer = BytesIO()
+        file_size = 0
+        with open(temp_path, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file_size += len(chunk)
+                if chunk:
+                    file.write(chunk)
+                    if file_size >= max_size:
+                        break
 
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for index, audio_url in enumerate(audio_urls):
-                try:
-                    response = requests.get(audio_url, stream=True)
-                    if response.status_code != 200:
-                        return jsonify({"error": f"Failed to download file from {audio_url}"}), 500
-
-                    file_name = f"audio_{index+1}.mp3"
-                    
-                    # Escrever diretamente no ZIP
-                    zipf.writestr(file_name, response.content)
-
-                except requests.exceptions.RequestException as e:
-                    logger.error(f"Request failed: {e}")
-                    return jsonify({"error": str(e)}), 500
-
-        # Garantir que o buffer está no início antes de enviar
-        zip_buffer.seek(0)
-
-        return send_file(zip_buffer, as_attachment=True, download_name="audio_files.zip", mimetype="application/zip")
-
+        time.sleep(1)
+        return temp_path
+    
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
         return jsonify({"error": str(e)}), 500
@@ -279,5 +315,5 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
-    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem')
+    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
