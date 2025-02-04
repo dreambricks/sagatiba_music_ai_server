@@ -5,13 +5,15 @@ import os
 import requests
 import time
 import redis
+import zipfile
+
+from io import BytesIO
 
 from flask import Flask, request, render_template, url_for, jsonify, send_file, redirect, session
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
 
 from utils.musicapi_util import create_music, get_music
 from utils.openai_util import moderation_ok, generate_lyrics
@@ -175,12 +177,12 @@ def process_music_tasks():
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
-
+    
     logger.info(f"Recebida requisição de áudio: {json}")  # Log dos dados de entrada
 
     task_id = json.get('task_id')
-    phone = json.get('phone')  # Obtém o número de telefone da sessão
-    host_url = request.host_url  # Obtém a URL do host para enviar o áudio via WhatsApp
+    phone = json.get('phone')  # Obtém o número de telefone
+    host_url = request.host_url  # Obtém a URL do host para envio
 
     if not task_id:
         logger.warning("Requisição sem Task ID")
@@ -188,21 +190,28 @@ def request_audio(json):
         return
 
     if not phone:
-        logger.warning("Requisição sem número de telefone na sessão")
+        logger.warning("Requisição sem número de telefone")
         emit('error_message', {'error': 'Phone number is required', 'code': 400}, namespace='/')
         return
 
     attempts = 0
     while attempts < 30:
-        logger.info(f"Tentativa {attempts + 1}: buscando áudio para task_id={task_id}")
-        emit('message', {'error': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
+        logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
+        emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
-        audio_url = get_music(task_id)
-        if audio_url:
-            logger.info(f"Áudio encontrado: {audio_url}. Enviando para {phone}.")
-            send_whatsapp_download_message(audio_url, host_url, phone)
-            emit('audio_response', {'audio_url': audio_url}, namespace='/')
-            return
+        audio_urls = get_music(task_id)  # Retorna uma lista de URLs de áudio
+
+        if audio_urls:  # Verifica se há pelo menos uma URL válida
+            logger.info(f"Áudio(s) encontrado(s) para {phone}: {audio_urls}")
+
+            # Enviar todas as URLs encontradas
+            for audio_url in audio_urls:
+                send_whatsapp_download_message(audio_url, host_url, phone)
+            
+            # Enviar resposta via WebSocket com todas as URLs
+            emit('audio_response', {'audio_urls': audio_urls}, namespace='/')
+
+            return  # **Sai do loop imediatamente ao encontrar áudio**
 
         socketio.sleep(10)
         attempts += 1
@@ -210,36 +219,44 @@ def request_audio(json):
     logger.error(f"Falha ao gerar áudio para task_id={task_id} após 30 tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
+import zipfile
+from io import BytesIO
 
-@app.route("/audio/download", methods=["GET"])
+@app.route("/audio/download", methods=["POST"])
 def download_audio():
-    """Provides a file download for the generated audio."""
-    audio_url = request.args.get('audio_url')
-    if not audio_url:
-        return jsonify({"error": "Audio URL not provided"}), 400
+    """Faz o download de múltiplos arquivos de áudio e retorna um ZIP contendo os arquivos."""
+    data = request.get_json()
+    audio_urls = data.get("audio_urls", [])
 
-    tmp_dir = 'temp/'
-    numero = random.randint(0, 99999)
-    data_atual = datetime.now().strftime("%d%m%Y%H%M%S")
-    result_name = f"{numero}_{data_atual}"
-    file_name = f"{result_name}.mp3"
-    temp_path = os.path.join(tmp_dir, file_name)
-
-    if not os.path.exists(tmp_dir):
-        os.makedirs(tmp_dir)
+    if not audio_urls or len(audio_urls) == 0:
+        return jsonify({"error": "Audio URLs not provided"}), 400
 
     try:
-        response = requests.get(audio_url, stream=True)
-        if response.status_code != 200:
-            return jsonify({"error": "Failed to download file"}), 500
 
-        with open(temp_path, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    file.write(chunk)
+        # Criar buffer de memória para o ZIP
+        zip_buffer = BytesIO()
 
-        time.sleep(1)
-        return send_file(temp_path, as_attachment=True, download_name=file_name, mimetype="audio/mpeg")
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for index, audio_url in enumerate(audio_urls):
+                try:
+                    response = requests.get(audio_url, stream=True)
+                    if response.status_code != 200:
+                        return jsonify({"error": f"Failed to download file from {audio_url}"}), 500
+
+                    file_name = f"audio_{index+1}.mp3"
+                    
+                    # Escrever diretamente no ZIP
+                    zipf.writestr(file_name, response.content)
+
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Request failed: {e}")
+                    return jsonify({"error": str(e)}), 500
+
+        # Garantir que o buffer está no início antes de enviar
+        zip_buffer.seek(0)
+
+        return send_file(zip_buffer, as_attachment=True, download_name="audio_files.zip", mimetype="application/zip")
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
         return jsonify({"error": str(e)}), 500
@@ -256,4 +273,5 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context = ('priv/fullchain.pem', 'priv/privkey.pem'))
+    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem')

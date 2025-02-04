@@ -2,7 +2,6 @@ import http.client
 import json
 from time import sleep
 
-
 def get_task_id(data):
     try:
         # Extract the task_id value
@@ -172,9 +171,7 @@ def create_music(lyrics):
     return create_music3(lyrics)
 
 
-def get_music(task_id):
-    import http.client
-
+def get_music(task_id): 
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = ""
     headers = {
@@ -183,12 +180,40 @@ def get_music(task_id):
     conn.request("GET", f"/api/v1/sonic/task/{task_id}", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    result = data.decode("utf-8")
-    print(f"Data is: {data}")
-    print(f"Result is: {result}")
+    
+    try:
+        result = json.loads(data.decode("utf-8"))  # Decodifica a resposta JSON
+    except json.JSONDecodeError:
+        return "Error: Unable to decode server response."
 
-    return get_audio_url(result)
+    # Check the HTTP status code to handle errors
+    if res.status == 401:  # Unauthorized
+        if 'Authorization header is missing.' in result.get('error', ''):
+            return "Error: Authorization header is missing."
+        elif 'Invalid authorization format.' in result.get('error', ''):
+            return "Error: Invalid authorization format."
+    elif res.status == 403:  # Forbidden
+        if 'The lyrics contain copyrighted content:' in result.get('error', ''):
+            return f"Error: {result['error']}"
+        elif 'The lyrics contain inappropriate content:' in result.get('error', ''):
+            return f"Error: {result['error']}"
+        elif 'The song description needs moderation review.' in result.get('error', ''):
+            return "Error: Song description needs moderation."
+        else:
+            return f"Error: {result['error']}"
+    elif res.status == 400:  # Bad Request
+        if 'task not found.' in result.get('error', ''):
+            return "Error: Task not found."
+    elif res.status == 500:  # Server Error
+        return "Status: Music is still being processed. Please wait."
+    elif res.status == 504:  # Timeout
+        return "Error: Task failed due to timeout. Credits were refunded."
+    else:
+        # Proceed normally if there are no errors.
+        print(f"Data is: {data}")
+        print(f"Result is: {result}")
 
+        return get_audio_url(result)
 
 def test_create_persona():
     create_persona()
