@@ -204,12 +204,18 @@ def request_audio(json):
         if audio_urls:  # Verifica se há pelo menos uma URL válida
             logger.info(f"Áudio(s) encontrado(s) para {phone}: {audio_urls}")
 
-            # Enviar todas as URLs encontradas
-            for audio_url in audio_urls:
-                send_whatsapp_download_message(audio_url, host_url, phone)
-            
-            # Enviar resposta via WebSocket com todas as URLs
-            emit('audio_response', {'audio_urls': audio_urls}, namespace='/')
+            # Criar lista de URLs de download
+            download_urls = [f"{host_url}audio/download?audio_url={url}" for url in audio_urls]
+
+            # Enviar todas as URLs de download para o WhatsApp
+            for download_url in download_urls:
+                send_whatsapp_download_message(download_url, phone)  # Agora envia `download_url` e `phone`
+
+            # Enviar resposta via WebSocket com todas as URLs e as respectivas de download
+            emit('audio_response', {
+                'audio_urls': audio_urls,
+                'download_urls': download_urls
+            }, namespace='/')
 
             return  # **Sai do loop imediatamente ao encontrar áudio**
 
