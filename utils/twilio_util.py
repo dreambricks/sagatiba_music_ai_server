@@ -29,9 +29,9 @@ def send_whatsapp_message(message, destination_number):
                                from_=from_whatsapp_number,
                                to=to_whatsapp_number)
 
-        logging.info("Message has been sent to %s", formatted_number)
+        logging.info(f"Message has been sent to {formatted_number}")
     except Exception as e:
-        logging.error("Error when sending message to %s: %s", formatted_number, str(e))
+        logging.error(f"Error when sending message to {destination_number}: {str(e)}")
 
 
 def send_whatsapp_download_message(url, host_url, destination_number):
@@ -50,6 +50,4 @@ def format_to_e164(phone_number, country_code='BR'):
         return phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
     except NumberParseException as e:
         raise ValueError(f"Error parsing phone number: {e}")
-    
 
- # send_whatsapp_message('Não confiar em carécas', '11959174501')
