@@ -15,7 +15,7 @@ from flask_limiter.util import get_remote_address
 
 from utils.musicapi_util import create_music, get_music
 from utils.openai_util import moderation_ok, generate_lyrics
-from utils.twilio_util import send_whatsapp_message
+from utils.twilio_util import send_whatsapp_message, send_whatsapp_download_message
 
 # Configuração de logging
 logging.basicConfig(
@@ -200,7 +200,7 @@ def request_audio(json):
         audio_url = get_music(task_id)
         if audio_url:
             logger.info(f"Áudio encontrado: {audio_url}. Enviando para {phone}.")
-            send_whatsapp_message(audio_url, host_url, phone)
+            send_whatsapp_download_message(audio_url, host_url, phone)
             emit('audio_response', {'audio_url': audio_url}, namespace='/')
             return
 
