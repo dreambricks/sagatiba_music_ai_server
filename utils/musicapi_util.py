@@ -2,6 +2,17 @@ import http.client
 import json
 from time import sleep
 
+clip_id = None  # Variável global para armazenar o clip_id
+
+def set_clip_id(new_clip_id):
+    """Define um novo clip_id para ser acessado globalmente."""
+    global clip_id
+    clip_id = new_clip_id
+
+def get_clip_id():
+    """Retorna o último clip_id salvo."""
+    return clip_id
+
 def get_task_id(data):
     try:
         # Extract the task_id value
@@ -120,7 +131,7 @@ def create_music3(lyrics):
         "custom_mode": True,
         "prompt": lyrics,
         "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-        "continue_clip_id": "a389bdbd-48c7-4679-8ee7-f563048fc519",
+        "continue_clip_id": clip_id,
         "continue_at": 35,
         "mv": "sonic-v4"
     })

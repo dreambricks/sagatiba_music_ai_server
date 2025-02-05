@@ -4,14 +4,17 @@ import requests
 import time
 import redis
 import re
+from datetime import datetime
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_apscheduler import APScheduler
 
-from utils.musicapi_util import create_music, get_music
+
+from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message
 
@@ -40,6 +43,33 @@ limiter = Limiter(
     storage_uri=redis_url,
     storage_options={"socket_connect_timeout": 30}
 )
+
+scheduler = APScheduler()
+
+def daily_upload():
+    """
+    Tarefa agendada que faz upload de música e armazena o clip_id.
+    """
+    now = datetime.now()
+    print(f"[WORKER] Executando upload às {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    response = upload_song()
+
+    if response:
+        try:
+            data = json.loads(response)
+            if data.get("code") == 200 and "clip_id" in data:
+                clip_id = data["clip_id"]
+                set_clip_id(clip_id)
+                print(f"[WORKER] Upload bem-sucedido! Clip ID salvo: {clip_id}")
+            else:
+                print(f"[WORKER] Falha no upload: {data}")
+        except json.JSONDecodeError:
+            print(f"[WORKER] Erro ao decodificar JSON: {response}")
+
+# Adiciona a tarefa ao scheduler para rodar diariamente
+scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', hours=24)
+scheduler.start()
 
 @app.route('/alive', methods=['GET'])
 def health_check():
