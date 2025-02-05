@@ -196,13 +196,22 @@ def request_audio(json):
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
         
-        audio_url = get_music(task_id)
+        audio_urls = get_music(task_id)
         
-        if isinstance(audio_url, str):
-            file_path = store_audio(audio_url)
-            logger.info(f"Áudio encontrado: {file_path}. Enviando para {phone}.")
-            send_whatsapp_download_message(file_path, host_url, phone)
-            emit('audio_response', {'audio_url': audio_url}, namespace='/')
+        if isinstance(audio_urls, str):
+            if audio_urls.startswith("Status"):  # Se for um status, não interrompe o loop
+                logger.info(f"Status recebido para task_id={task_id}: {audio_urls}")
+                emit('message', {'status': audio_urls}, namespace='/')
+            else:  # Se for um erro real, interrompe o loop e responde
+                logger.error(f"Erro ao obter áudio para task_id={task_id}: {audio_urls}")
+                emit('error_message', {'error': audio_urls, 'code': 500}, namespace='/')
+                return
+
+        if isinstance(audio_urls, list) and len(audio_urls) > 0:
+            file_paths = [store_audio(url) for url in audio_urls]
+            logger.info(f"Áudiox encontrado: {file_paths}. Enviando para {phone}.")
+            send_whatsapp_download_message(file_paths, host_url, phone)
+            emit('audio_response', {'audio_urls': audio_urls}, namespace='/')
             return
 
         socketio.sleep(10)
@@ -269,15 +278,12 @@ def get_task_id_from_url(url):
     - 'https://audiopipe.suno.ai/?item_id=<task_id>'
     - 'https://cdn1.suno.ai/<task_id>.mp3'
     """
-    print(url)
     pattern = re.compile(r'([a-f0-9-]{36})')  # Matches UUID-like patterns
     match = pattern.search(url)
     return match.group(1) if match else None
 
 
 def store_audio(url, max_size=1177*1024):
-    print("store_audio: ")
-    print(url)
     tmp_dir = 'static/mp3/'
     task_id = get_task_id_from_url(url)
     file_name = f"sagatiba_{task_id}.mp3"

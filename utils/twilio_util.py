@@ -34,9 +34,12 @@ def send_whatsapp_message(message, destination_number):
         logging.error(f"Error when sending message to {destination_number}: {str(e)}")
 
 
-def send_whatsapp_download_message(url, host_url, destination_number):
-    download_url = f"{host_url}audio/download?audio_url={url}"
-    message_body = f"Sagalover, sua música está pronta para ser ouvida e compartilhada!\n{download_url}" 
+def send_whatsapp_download_message(urls, host_url, destination_number):
+    download_urls = [f"{host_url}audio/download?audio_url={url}" for url in urls if url]  # Apenas URLs válidas
+
+    message_body = f"Sagalover, suas músicas estão prontas para serem ouvidas!\n" \
+                   f"Geramos duas músicas para que possa escolher a que mais gostou:\n" \
+                   f"\n".join(download_urls)
     send_whatsapp_message(message_body, destination_number)
 
 

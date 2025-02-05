@@ -21,7 +21,7 @@ def get_audio_url(result):
         print(audio_urls)
 
         if audio_urls and audio_urls[0]:
-            return audio_urls[0]
+            return audio_urls
 
     except json.JSONDecodeError:
         # Handle the case where the input is not a valid JSON string
