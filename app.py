@@ -128,10 +128,10 @@ def process_music_tasks():
 
     lyrics = task_data["lyrics"]
     task_phone = task_data["phone"]
+    task_id = create_music(lyrics)
 
     if task_phone == phone:
         # Se o telefone bate, processamos e retornamos a resposta ao frontend
-        task_id = create_music(lyrics)
         if task_id:
             conn.hset("processed_tasks", phone, task_id)  # Salva task_id no Redis
             return jsonify({"task_id": task_id}), 200
@@ -191,13 +191,15 @@ def request_audio(json):
         return
 
     attempts = 0
-    while attempts < 30:
+    while attempts < 70:
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
+        
         audio_url = get_music(task_id)
-        file_path = store_audio(audio_url)
-        if audio_url:
+        
+        if isinstance(audio_url, str):
+            file_path = store_audio(audio_url)
             logger.info(f"Áudio encontrado: {file_path}. Enviando para {phone}.")
             send_whatsapp_download_message(file_path, host_url, phone)
             emit('audio_response', {'audio_url': audio_url}, namespace='/')
@@ -206,7 +208,7 @@ def request_audio(json):
         socketio.sleep(10)
         attempts += 1
 
-    logger.error(f"Falha ao gerar áudio para task_id={task_id} após 30 tentativas")
+    logger.error(f"Falha ao gerar áudio para task_id={task_id} após 70 tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
 @app.route("/audio/download", methods=["GET"])
@@ -267,13 +269,15 @@ def get_task_id_from_url(url):
     - 'https://audiopipe.suno.ai/?item_id=<task_id>'
     - 'https://cdn1.suno.ai/<task_id>.mp3'
     """
+    print(url)
     pattern = re.compile(r'([a-f0-9-]{36})')  # Matches UUID-like patterns
     match = pattern.search(url)
     return match.group(1) if match else None
 
 
 def store_audio(url, max_size=1177*1024):
-
+    print("store_audio: ")
+    print(url)
     tmp_dir = 'static/mp3/'
     task_id = get_task_id_from_url(url)
     file_name = f"sagatiba_{task_id}.mp3"
@@ -315,5 +319,5 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
-    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
+    socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    #socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))

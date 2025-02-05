@@ -14,20 +14,14 @@ def get_task_id(data):
         return None
 
 
-def get_audio_url(json_string):
+def get_audio_url(result):
     try:
-        data = json.loads(json_string)
-
+        data = json.loads(result)
         audio_urls = [item.get("audio_url") for item in data.get("data", [])]
         print(audio_urls)
 
         if audio_urls and audio_urls[0]:
             return audio_urls[0]
-
-    except json.JSONDecodeError:
-        # Handle the case where the input is not a valid JSON string
-        print("Invalid JSON string")
-        return None
 
     except json.JSONDecodeError:
         # Handle the case where the input is not a valid JSON string
@@ -126,8 +120,8 @@ def create_music3(lyrics):
         "custom_mode": True,
         "prompt": lyrics,
         "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-        "continue_clip_id": "eb7357db-847b-4629-bba6-e76b69631b90",
-        "continue_at": 18,
+        "continue_clip_id": "a389bdbd-48c7-4679-8ee7-f563048fc519",
+        "continue_at": 35,
         "mv": "sonic-v4"
     })
     headers = {
@@ -181,28 +175,30 @@ def get_music(task_id):
     res = conn.getresponse()
     data = res.read()
     
+    result = data.decode("utf-8")
+
     try:
-        result = json.loads(data.decode("utf-8"))  # Decodifica a resposta JSON
+        message = json.loads(result)  # Decodifica a resposta JSON
     except json.JSONDecodeError:
         return "Error: Unable to decode server response."
 
     # Check the HTTP status code to handle errors
     if res.status == 401:  # Unauthorized
-        if 'Authorization header is missing.' in result.get('error', ''):
+        if 'Authorization header is missing.' in message.get('error', ''):
             return "Error: Authorization header is missing."
-        elif 'Invalid authorization format.' in result.get('error', ''):
+        elif 'Invalid authorization format.' in message.get('error', ''):
             return "Error: Invalid authorization format."
     elif res.status == 403:  # Forbidden
-        if 'The lyrics contain copyrighted content:' in result.get('error', ''):
-            return f"Error: {result['error']}"
-        elif 'The lyrics contain inappropriate content:' in result.get('error', ''):
-            return f"Error: {result['error']}"
-        elif 'The song description needs moderation review.' in result.get('error', ''):
+        if 'The lyrics contain copyrighted content:' in message.get('error', ''):
+            return f"Error: {message['error']}"
+        elif 'The lyrics contain inappropriate content:' in message.get('error', ''):
+            return f"Error: {message['error']}"
+        elif 'The song description needs moderation review.' in message.get('error', ''):
             return "Error: Song description needs moderation."
         else:
-            return f"Error: {result['error']}"
+            return f"Error: {message['error']}"
     elif res.status == 400:  # Bad Request
-        if 'task not found.' in result.get('error', ''):
+        if 'task not found.' in message.get('error', ''):
             return "Error: Task not found."
     elif res.status == 500:  # Server Error
         return "Status: Music is still being processed. Please wait."
