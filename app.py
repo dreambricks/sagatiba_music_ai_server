@@ -13,10 +13,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_apscheduler import APScheduler
 
-
 from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id
 from utils.openai_util import moderation_ok, generate_lyrics
-from utils.twilio_util import send_whatsapp_download_message
+from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
 
 # Configuração de logging
 logging.basicConfig(
@@ -129,6 +128,8 @@ def generate_task_id():
     data = request.get_json()
     lyrics = data.get("lyrics")
     phone = data.get("phone")
+    message = "Oi Sagalover! Sua música está sendo preparada."
+    send_whatsapp_message(message, phone)
     if not lyrics:
         logger.info(f"Task not enqueued for phone: {phone}")
         return jsonify({"error": "Lyrics parameter is missing"}), 400
