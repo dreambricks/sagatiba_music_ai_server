@@ -81,9 +81,10 @@ def create_persona():
 
 def upload_song(host_url):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
+    payload_url = host_url
     payload = json.dumps({
         # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
-        "url": f"{host_url}static/trecho/vai_la_02.mp3"
+        "url": payload_url
     })
     headers = {
         'Content-Type': 'application/json',
@@ -126,9 +127,9 @@ def create_music3(lyrics):
         "task_type": "extend_upload_music",
         "custom_mode": True,
         "prompt": lyrics,
-        "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
+        "tags": "sertanejo, female voices, back vocals, 30 seconds long",
         "continue_clip_id": clip_id,
-        "continue_at": 37,
+        "continue_at": 35,
         "mv": "sonic-v4"
     })
     headers = {
