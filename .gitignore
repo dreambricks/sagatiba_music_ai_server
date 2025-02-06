@@ -168,5 +168,4 @@ cython_debug/
 test_socket.py
 
 /temp
-static/mp3/sagatiba_98618888-870b-460e-8baf-e7aa0a1573a5.mp3
-static/mp3/sagatiba_bc9895b4-d977-42e7-97ab-611beb99979e.mp3
+/static/mp3

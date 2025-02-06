@@ -181,10 +181,13 @@ def process_music_tasks():
     lyrics = task_data["lyrics"]
     task_phone = task_data["phone"]
 
-    # Verifica se a música já foi processada
-    existing_task_id = lyrics_db.hget("lyrics_store", phone)
-    if existing_task_id:
-        return jsonify({"message": "Music already processed", "task_id": existing_task_id.decode("utf-8")}), 200
+    # Verifica se a música já foi processada para este telefone e adiciona novo task_id
+    existing_task_ids = lyrics_db.lrange(f"lyrics_store:{phone}", 0, -1)
+
+    if existing_task_ids and len(existing_task_ids) > 0:
+        decoded_task_ids = [task_id.decode("utf-8") for task_id in existing_task_ids]
+        logger.info(f"Existing task IDs for {phone}: {decoded_task_ids}")
+
 
     # Cria a música e retorna um task_id
     task_id = create_music(lyrics)
@@ -195,7 +198,8 @@ def process_music_tasks():
             task_db.hset("processed_tasks", phone, task_id)
 
             # Salva a música no Redis (Banco de letras/músicas)
-            lyrics_db.hset("lyrics_store", task_id, lyrics)
+            lyrics_db.rpush(f"lyrics_store:{phone}", task_id)  # Adiciona um novo task_id na lista
+            lyrics_db.hset("lyrics_store", task_id, lyrics)  # Salva as letras associadas ao task_id
             lyrics_db.hset("lyrics_store", phone, task_id) # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
 
             return jsonify({"task_id": task_id}), 200
@@ -307,7 +311,7 @@ def request_audio(json):
                 return
 
         if isinstance(audio_urls, list) and len(audio_urls) > 0:
-            file_paths = [store_audio(url) for url in audio_urls]
+            file_paths = [store_audio(url, task_id) for url in audio_urls]
             logger.info(f"Áudios armazenados: {file_paths}")
 
             # Gerar link para o usuário acessar no frontend
@@ -385,16 +389,15 @@ def get_task_id_from_url(url):
     return match.group(1) if match else None
 
 
-def store_audio(url, max_size=1177*1024):
+def store_audio(url, task_id, max_size=1177*1024):
     """
     Baixa e armazena um arquivo de áudio, garantindo que múltiplos arquivos para o mesmo task_id não sejam sobrescritos.
     """
     tmp_dir = 'static/mp3/'
-    task_id = get_task_id_from_url(url)
     
-    # Se não conseguir extrair o task_id, retorna erro
+    # Se não existir, extrai o task_id
     if not task_id:
-        return jsonify({"error": "Invalid task ID from URL"}), 400
+        task_id = get_task_id_from_url(url)
 
     # Garante que o diretório de destino exista
     if not os.path.exists(tmp_dir):
