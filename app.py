@@ -225,7 +225,7 @@ def request_audio(json):
 
     task_id = json.get('task_id')
     phone = json.get('phone')  # Obtém o número de telefone
-    host_url = request.host_url  # Obtém a URL do host para envio
+    host_url = os.getenv("HOST_URL")  # Obtém a URL do host para envio
 
     if not task_id:
         logger.warning("Requisição sem Task ID")
