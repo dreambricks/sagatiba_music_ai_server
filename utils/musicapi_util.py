@@ -83,7 +83,7 @@ def upload_song(host_url):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
-        "url": f"{host_url}static/mp3/vai_la_02.mp3"
+        "url": f"{host_url}static/trecho/vai_la_02.mp3"
     })
     headers = {
         'Content-Type': 'application/json',
