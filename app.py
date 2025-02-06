@@ -33,13 +33,18 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
-redis_url = "redis://localhost:6379"
-conn = redis.from_url(redis_url)
+# Configuração dos bancos de dados Redis
+task_db = redis.Redis(host='localhost', port=6379, db=0)   # Banco para enfileiramento de tarefas
+lyrics_db = redis.Redis(host='localhost', port=6379, db=1) # Banco para armazenamento das letras de músicas
 
+# Atualiza o Redis URL apenas para o limiter, apontando para db=2
+limiter_redis_url = "redis://localhost:6379/2"
+
+# Configuração do Rate Limiter no DB 2
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,  
-    storage_uri=redis_url,
+    storage_uri=limiter_redis_url,
     storage_options={"socket_connect_timeout": 30}
 )
 
@@ -175,19 +180,54 @@ def process_music_tasks():
 
     lyrics = task_data["lyrics"]
     task_phone = task_data["phone"]
+
+    # Verifica se a música já foi processada
+    existing_task_id = lyrics_db.hget("lyrics_store", phone)
+    if existing_task_id:
+        return jsonify({"message": "Music already processed", "task_id": existing_task_id.decode("utf-8")}), 200
+
+    # Cria a música e retorna um task_id
     task_id = create_music(lyrics)
 
     if task_phone == phone:
-        # Se o telefone bate, processamos e retornamos a resposta ao frontend
         if task_id:
-            conn.hset("processed_tasks", phone, task_id)  # Salva task_id no Redis
+            # Salva task_id no Redis (Banco de tarefas)
+            task_db.hset("processed_tasks", phone, task_id)
+
+            # Salva a música no Redis (Banco de letras/músicas)
+            lyrics_db.hset("lyrics_store", task_id, lyrics)
+            lyrics_db.hset("lyrics_store", phone, task_id) # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
+
             return jsonify({"task_id": task_id}), 200
         else:
             return jsonify({"error": "Failed to create music task"}), 500
     else:
-        # Se não bate, envia o áudio ao telefone correto e retorna 202 (Aceito, sem resposta imediata)
+        # Se o telefone não bate, envia o áudio ao telefone correto
         request_audio({"task_id": task_id, "phone": task_phone})
         return jsonify({"status": "Audio sent to original requester"}), 202
+
+@app.route("/lyrics/get", methods=["GET"])
+def get_lyrics():
+    """Retorna as letras da música armazenadas no Redis pelo task_id."""
+    task_id = request.args.get("task_id")
+
+    if not task_id:
+        return jsonify({"error": "Task ID is required"}), 400
+
+    try:
+        lyrics = lyrics_db.hget("lyrics_store", task_id)
+
+        if lyrics is None:
+            return jsonify({"error": "Lyrics not found for the given Task ID"}), 404
+
+        result = lyrics.decode("utf-8")
+
+        return jsonify({"task_id": task_id, "lyrics": result}), 200
+
+    except Exception as e:
+        logger.error(f"Erro ao recuperar letras para task_id={task_id}: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
 
 # @app.route("/lyrics/generate", methods=["GET"])
 # def generate_task_id():
@@ -364,11 +404,11 @@ def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
     task_data = json.dumps({"lyrics": lyrics, "phone": phone})
     logger.info(f"Enqueuing task: {task_data}")
-    conn.rpush('lyrics_queue', task_data)
+    task_db.rpush('lyrics_queue', task_data)
 
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
-    return conn.lpop('lyrics_queue')
+    return task_db.lpop('lyrics_queue')
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
