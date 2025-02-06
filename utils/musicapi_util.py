@@ -79,14 +79,11 @@ def create_persona():
     print(data.decode("utf-8"))
 
 
-def upload_song():
+def upload_song(host_url):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
-        #"url": "https://sagatibamusicai.ddns.net:5002/static/MARAISA_01_50s.mp3"
-        #"url": "https://sagatibamusicai.ddns.net:5002/static/karina.mp3"
-        #"url": "https://sagatibamusicai.ddns.net:5002/static/narcisista.m4a"
-        #"url": "https://sagatibamusicai.ddns.net:5002/static/mm_medo_bobo_live_50s.mp3"
-        "url": "https://audio.jukehost.co.uk/Ij5SXdAJKLg4tggS8T1xIH1Z0DuOWq5e.mp3"
+        # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
+        "url": f"{host_url}static/mp3/vai_la_02.mp3"
     })
     headers = {
         'Content-Type': 'application/json',
@@ -95,9 +92,8 @@ def upload_song():
     conn.request("POST", "/api/v1/sonic/upload", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    print(data.decode("utf-8"))
-    # {"code": 200, "clip_id": "05722510-0bc9-4e8c-a3cc-1f72277a1752", "message": "success"}
-
+    result = data.decode("utf-8")
+    return result
 
 def create_music2(lyrics):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
@@ -132,7 +128,7 @@ def create_music3(lyrics):
         "prompt": lyrics,
         "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
         "continue_clip_id": clip_id,
-        "continue_at": 35,
+        "continue_at": 37,
         "mv": "sonic-v4"
     })
     headers = {

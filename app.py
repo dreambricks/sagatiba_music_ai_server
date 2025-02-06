@@ -13,7 +13,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_apscheduler import APScheduler
 
-from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id
+from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
 
@@ -50,9 +50,10 @@ def daily_upload():
     Tarefa agendada que faz upload de música e armazena o clip_id.
     """
     now = datetime.now()
-    print(f"[WORKER] Executando upload às {now.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"[WORKER] Executando upload às {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    response = upload_song()
+    host_url = os.getenv("HOST_URL")  # Usa a variável de ambiente
+    response = upload_song(host_url)
 
     if response:
         try:
@@ -60,20 +61,35 @@ def daily_upload():
             if data.get("code") == 200 and "clip_id" in data:
                 clip_id = data["clip_id"]
                 set_clip_id(clip_id)
-                print(f"[WORKER] Upload bem-sucedido! Clip ID salvo: {clip_id}")
+                logger.info(f"[WORKER] Upload bem-sucedido! Clip ID salvo: {clip_id}")
             else:
-                print(f"[WORKER] Falha no upload: {data}")
+                logger.warning(f"[WORKER] Falha no upload: {data}")
         except json.JSONDecodeError:
-            print(f"[WORKER] Erro ao decodificar JSON: {response}")
+            logger.error(f"[WORKER] Erro ao decodificar JSON: {response}")
 
 # Adiciona a tarefa ao scheduler para rodar diariamente
-scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', hours=24)
+# scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', minutes=1)
+scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', hours=24, next_run_time=datetime.now())
 scheduler.start()
 
 @app.route('/alive', methods=['GET'])
 def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
+
+@app.route("/check/clip_id", methods=["GET"])
+def check_clip_id():
+    """
+    Retorna o valor atual do clip_id armazenado.
+    Se não houver um clip_id, informa que ele ainda não foi gerado.
+    """
+    clip_id = get_clip_id()  # Obtém o valor do clip_id salvo
+
+    if clip_id:
+        return jsonify({"clip_id": clip_id}), 200
+    else:
+        return jsonify({"error": "clip_id ainda não foi gerado"}), 404
+
 
 # @app.route("/lyrics/form", methods=["GET"])
 # def display_lyrics_form():
@@ -357,4 +373,4 @@ def dequeue_task():
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
     socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
-    #socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
+    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
