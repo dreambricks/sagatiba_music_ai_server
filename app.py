@@ -207,26 +207,38 @@ def process_music_tasks():
         return jsonify({"status": "Audio sent to original requester"}), 202
 
 @app.route("/lyrics/get", methods=["GET"])
-def get_lyrics():
-    """Retorna as letras da música armazenadas no Redis pelo task_id."""
+def get_lyrics_and_audio():
+    """Retorna as letras da música e os arquivos de áudio associados ao task_id."""
     task_id = request.args.get("task_id")
 
     if not task_id:
         return jsonify({"error": "Task ID is required"}), 400
 
     try:
+        # Recupera as letras associadas ao task_id
         lyrics = lyrics_db.hget("lyrics_store", task_id)
-
-        if lyrics is None:
+        if not lyrics:
             return jsonify({"error": "Lyrics not found for the given Task ID"}), 404
 
-        result = lyrics.decode("utf-8")
+        lyrics_decoded = lyrics.decode("utf-8")
 
-        return jsonify({"task_id": task_id, "lyrics": result}), 200
+        # Diretório onde os áudios estão armazenados
+        audio_dir = "static/mp3/"
+        audio_files = [
+            f"{request.host_url}{audio_dir}{file}"
+            for file in os.listdir(audio_dir)
+            if file.startswith(f"sagatiba_{task_id}_")
+        ]
+
+        return jsonify({
+            "audio_urls": audio_files,
+            "lyrics": lyrics_decoded
+        }), 200
 
     except Exception as e:
-        logger.error(f"Erro ao recuperar letras para task_id={task_id}: {str(e)}")
+        logger.error(f"Erro ao buscar letras e áudios: {e}")
         return jsonify({"error": "Internal server error"}), 500
+
 
 
 # @app.route("/lyrics/generate", methods=["GET"])
@@ -296,9 +308,12 @@ def request_audio(json):
 
         if isinstance(audio_urls, list) and len(audio_urls) > 0:
             file_paths = [store_audio(url) for url in audio_urls]
-            logger.info(f"Áudiox encontrado: {file_paths}. Enviando para {phone}.")
-            send_whatsapp_download_message(file_paths, host_url, phone)
-            emit('audio_response', {'audio_urls': audio_urls}, namespace='/')
+            logger.info(f"Áudios armazenados: {file_paths}")
+
+            # Gerar link para o usuário acessar no frontend
+            message_url = f"{host_url}mensagem?id={task_id}"
+            send_whatsapp_download_message(message_url, phone)
+            emit('audio_response', {'audio_urls': file_paths}, namespace='/')
             return
 
         socketio.sleep(10)
@@ -371,13 +386,28 @@ def get_task_id_from_url(url):
 
 
 def store_audio(url, max_size=1177*1024):
+    """
+    Baixa e armazena um arquivo de áudio, garantindo que múltiplos arquivos para o mesmo task_id não sejam sobrescritos.
+    """
     tmp_dir = 'static/mp3/'
     task_id = get_task_id_from_url(url)
-    file_name = f"sagatiba_{task_id}.mp3"
-    temp_path = os.path.join(tmp_dir, file_name)
+    
+    # Se não conseguir extrair o task_id, retorna erro
+    if not task_id:
+        return jsonify({"error": "Invalid task ID from URL"}), 400
 
+    # Garante que o diretório de destino exista
     if not os.path.exists(tmp_dir):
         os.makedirs(tmp_dir)
+
+    # Define um nome de arquivo único
+    count = 1
+    while True:
+        file_name = f"sagatiba_{task_id}_{count}.mp3"
+        temp_path = os.path.join(tmp_dir, file_name)
+        if not os.path.exists(temp_path):  # Se o arquivo ainda não existe, usamos esse nome
+            break
+        count += 1  # Caso contrário, incrementa e tenta novamente
 
     try:
         response = requests.get(url, stream=True)
@@ -391,10 +421,15 @@ def store_audio(url, max_size=1177*1024):
                 if chunk:
                     file.write(chunk)
                     if file_size >= max_size:
-                        break
+                        break  # Para o download se atingir o limite de tamanho
 
         time.sleep(1)
-        return temp_path
+        return temp_path  # Retorna o caminho do arquivo salvo
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erro ao baixar áudio: {e}")
+        return jsonify({"error": str(e)}), 500
+
     
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")

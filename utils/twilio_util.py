@@ -33,14 +33,21 @@ def send_whatsapp_message(message, destination_number):
     except Exception as e:
         logging.error(f"Error when sending message to {destination_number}: {str(e)}")
 
+def send_whatsapp_download_message(message_url, destination_number):
+    """Envia a mensagem do WhatsApp com o link para acessar as músicas."""
+    message_body = f"Sagalover, suas músicas estão prontas! 🎶🔥\n" \
+                   f"Acesse o link abaixo para escolher sua favorita:\n\n" \
+                   f"{message_url}"
 
-def send_whatsapp_download_message(urls, host_url, destination_number):
-    download_urls = [f"{host_url}audio/download?audio_url={url}" for url in urls if url]  # Apenas URLs válidas
-
-    message_body = f"Sagalover, suas músicas estão prontas para serem ouvidas!\n" \
-                   f"Geramos duas músicas para que possa escolher a que mais gostou:\n" \
-                   f"\n".join(download_urls)
     send_whatsapp_message(message_body, destination_number)
+
+# def send_whatsapp_download_message(urls, host_url, destination_number):
+#     download_urls = [f"{host_url}audio/download?audio_url={url}" for url in urls if url]  # Apenas URLs válidas
+
+#     message_body = f"Sagalover, suas músicas estão prontas para serem ouvidas!\n" \
+#                    f"Geramos duas músicas para que possa escolher a que mais gostou:\n" \
+#                    f"\n".join(download_urls)
+#     send_whatsapp_message(message_body, destination_number)
 
 
 def format_to_e164(phone_number, country_code='BR'):
