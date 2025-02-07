@@ -1,8 +1,10 @@
+import logging
 import openai
 from dotenv import load_dotenv, find_dotenv
 from utils.db_util import load_file_into_set, remove_accent
 import parameters as param
 
+logger = logging.getLogger(__name__)
 
 _ = load_dotenv(find_dotenv())
 client = openai.OpenAI()
@@ -14,10 +16,11 @@ def load_black_list():
 
 def has_black_list_words(black_set, input_string):
     input_set = set([remove_accent(word) for word in input_string.split()])
-    if black_set & input_set:
-        return True
+    intersection = black_set & input_set
+    if intersection:
+        return [True, ", ".join(intersection)]
 
-    return False
+    return [False, '']
 
 
 def load_other_brands():
@@ -25,12 +28,14 @@ def load_other_brands():
 
 
 def has_other_brands(other_brands_set, input_string):
-    no_accent_is = remove_accent(input_string)
+    no_accent_is = set([remove_accent(word) for word in input_string.split()])
+
+    print(",".join(no_accent_is))
     for brand in other_brands_set:
         if brand in no_accent_is:
-            return True
+            return [True, brand]
 
-    return False
+    return [False, '']
 
 
 black_list = load_black_list()
@@ -38,24 +43,42 @@ other_brands_list = load_other_brands()
 
 
 def moderation_ok(convidado, recado):
-    if has_black_list_words(black_list, convidado) or has_black_list_words(black_list, recado):
-        return False
+    is_not_ok, error_msg = has_black_list_words(black_list, convidado)
+    if is_not_ok:
+        return [False, f"O convidado contém palavras não permitidas: {error_msg}"]
 
-    if has_other_brands(other_brands_list, convidado) or has_other_brands(other_brands_list, recado):
-        return False
+    is_not_ok, error_msg = has_black_list_words(black_list, recado)
+    if is_not_ok:
+        return [False, f"O recado palavras não permitidas: {error_msg}"]
+
+    is_not_ok, error_msg = has_other_brands(other_brands_list, convidado)
+    if is_not_ok:
+        return [False, f"O convidado contém outras marcas de bebidas: {error_msg}"]
+
+    is_not_ok, error_msg = has_other_brands(other_brands_list, recado)
+    if is_not_ok:
+        return [False, f"O recado contém outras marcas de bebidas: {error_msg}"]
 
     prompt = (
-        f"Poderia informar se o texto a seguir, destacado entre ###, seria aprovado?\n"
-        f"Responda apenas S para sim ou N para não.\n"
+        f"Poderia informar se o texto a seguir, destacado entre ###, pode ser aprovado?\n"
+        f"Responda apenas S para sim, caso a resposta seja não, informe o porquê da não aprovação\n"
         f"###\n"
-        f"{convidado} {recado}\n"
+        f"{convidado}, {recado}\n"
         f"###"
     )
 
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Você é um censor de textos de um jornal sobre bebidas alcóolicas e precisa avaliar se os textos enviados tem algo com conotação negativa, referências políticas, referências religiosas, palavrões e termos pejorativos. O jornal deve passar sempre uma mensagem divertida e alegre e evitar, a todo custo, algo que possa deixar alguém triste. Referências a bebidas alcóolicas são permitidas, desde que não sejam usadas de forma pejorativa."},
+            {"role": "system", "content": """
+            Você é um censor de textos de um jornal sobre bebidas alcóolicas e precisa avaliar se os 
+            textos enviados tem algo com conotação negativa, referências políticas, referências religiosas, 
+            palavrões e termos pejorativos. O jornal deve passar sempre uma mensagem divertida e alegre e evitar, 
+            a todo custo, algo que possa deixar alguém triste. 
+            Referências a bebidas alcóolicas são permitidas, desde que não sejam usadas de forma pejorativa.
+            Não pode incentivar o consumo exagerado, compulsivo ou irresponsável de álcool.
+            Não pode sugerir que o consumo de bebidas alcoólicas traz sucesso pessoal, 
+            profissional, esportivo, social ou sexual."""},
             {"role": "user", "content": prompt}
         ],
         response_format={
@@ -68,16 +91,18 @@ def moderation_ok(convidado, recado):
         presence_penalty=0
     )
 
-    print(prompt)
-    print(response)
+    logger.info(prompt)
+    logger.info(response)
     result = response.choices[0].message.content
-    print(result)
+    logger.info(result)
 
-    return result == 'S'
+    if result != 'S':
+        return [False, result]
 
+    return [True, "OK"]
 
 def generate_lyrics(convidado, opcao, dia_semana, recado):
-    print(opcao)
+    logger.info(opcao)
 
     if opcao == "BAR":
         opcao = "beber cachaça sagatiba no bar"
@@ -119,8 +144,8 @@ def generate_lyrics(convidado, opcao, dia_semana, recado):
         presence_penalty=0
     )
 
-    print(prompt)
-    print(response)
+    logger.info(prompt)
+    logger.info(response)
     lyrics = response.choices[0].message.content
     return lyrics
 

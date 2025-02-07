@@ -133,14 +133,15 @@ def call_generate_lyrics():
     logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
                 f"weekdays={weekdays}, message={message}")
 
-    if moderation_ok(destination, message):
+    is_ok, error_msg = moderation_ok(destination, message)
+    if is_ok:
         lyrics = generate_lyrics(destination, invite_options, weekdays, message)
         logger.info("Lyrics generated successfully.")
         #return redirect(url_for('display_lyrics', lyrics=lyrics, phonw=phonw))
         return jsonify({"lyrics": lyrics})
     else:
         logger.warning("Submitted text violates moderation rules.")
-        return jsonify({"error": "Content blocked due to inappropriate references."}), 403
+        return jsonify({"error": error_msg}), 403
 
 
 @app.route("/lyrics/generate", methods=["GET", "POST"])
