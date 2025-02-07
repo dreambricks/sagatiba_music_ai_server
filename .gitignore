@@ -167,5 +167,4 @@ cython_debug/
 /priv
 test_socket.py
 
-/temp
 /static/mp3

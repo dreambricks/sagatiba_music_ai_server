@@ -12,6 +12,8 @@ from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_apscheduler import APScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 
 from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id
 from utils.openai_util import moderation_ok, generate_lyrics
@@ -50,13 +52,13 @@ limiter = Limiter(
 
 scheduler = APScheduler()
 
-def daily_upload():
+def scheduled_upload():
     """
-    Tarefa agendada que faz upload de música e armazena o clip_id.
+    Tarefa agendada que faz upload de música e armazena o clip_id com data e hora em um CSV.
     """
     now = datetime.now()
-    logger.info(f"[WORKER] Executando upload às {now.strftime('%Y-%m-%d %H:%M:%S')}")
-
+    logging.info(f"[WORKER] Executando upload às {now.strftime('%Y-%m-%d %H:%M:%S')}")
+    
     host_url = os.getenv("HOST_URL")  # Usa a variável de ambiente
     response = upload_song(host_url)
 
@@ -65,16 +67,38 @@ def daily_upload():
             data = json.loads(response)
             if data.get("code") == 200 and "clip_id" in data:
                 clip_id = data["clip_id"]
-                set_clip_id(clip_id)
-                logger.info(f"[WORKER] Upload bem-sucedido! Clip ID salvo: {clip_id}")
+                set_clip_id(clip_id, now.strftime('%Y-%m-%d %H:%M:%S'))
+                logging.info(f"[WORKER] Upload bem-sucedido! Clip ID salvo: {clip_id}")
             else:
-                logger.warning(f"[WORKER] Falha no upload: {data}")
+                logging.warning(f"[WORKER] Falha no upload: {data}")
         except json.JSONDecodeError:
-            logger.error(f"[WORKER] Erro ao decodificar JSON: {response}")
+            logging.error(f"[WORKER] Erro ao decodificar JSON: {response}")
 
-# Adiciona a tarefa ao scheduler para rodar diariamente
-# scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', minutes=1)
-scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', hours=24, next_run_time=datetime.now())
+# Função para limpar as tarefas do Redis
+def clear_task_db():
+    task_db.flushdb()
+    logging.info("[SCHEDULER] Banco de tarefas do Redis limpo às 04:00 AM")
+
+# Adicionando agendamentos
+scheduler.add_job(
+    id='scheduled_upload_morning',
+    func=scheduled_upload,
+    trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
+    replace_existing=True
+)
+scheduler.add_job(
+    id='scheduled_upload_afternoon',
+    func=scheduled_upload,
+    trigger=CronTrigger(hour=16, minute=0),  # Roda todo dia às 04:00 PM
+    replace_existing=True
+)
+scheduler.add_job(
+    id='clear_task_db',
+    func=clear_task_db,
+    trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
+    replace_existing=True
+)
+
 scheduler.start()
 
 @app.route('/alive', methods=['GET'])
@@ -82,19 +106,36 @@ def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
 
-@app.route("/check/clip_id", methods=["GET"])
+@app.route("/check/clip_id", methods=["GET", "POST"])
 def check_clip_id():
     """
-    Retorna o valor atual do clip_id armazenado.
-    Se não houver um clip_id, informa que ele ainda não foi gerado.
+    GET: Retorna o valor atual do clip_id armazenado com data e hora.
+    Se não houver clip_id, aciona um scheduled_upload automaticamente.
+    
+    POST: Executa scheduled_upload caso não haja clip_id salvo.
     """
-    clip_id = get_clip_id()  # Obtém o valor do clip_id salvo
+    if request.method == "GET":
+        clip_data = get_clip_id()
+        if not clip_data:
+            logging.info("[CHECK] Nenhum clip_id encontrado. Executando upload automático.")
+            clip_data = scheduled_upload()
+            if clip_data:
+                return jsonify(clip_data), 200
+            return jsonify({"error": "Falha ao gerar clip_id"}), 500
+        return jsonify({
+            "clip_id": clip_data["clip_id"],
+            "timestamp": clip_data["timestamp"]
+        }), 200
 
-    if clip_id:
-        return jsonify({"clip_id": clip_id}), 200
-    else:
-        return jsonify({"error": "clip_id ainda não foi gerado"}), 404
-
+    elif request.method == "POST":
+        clip_data = get_clip_id()
+        if not clip_data:
+            logging.info("[CHECK] Nenhum clip_id encontrado. Executando upload via POST.")
+            clip_data = scheduled_upload()
+            if clip_data:
+                return jsonify({"message": "Upload acionado.", "clip_id": clip_data["clip_id"], "timestamp": clip_data["timestamp"]}), 200
+            return jsonify({"error": "Falha ao gerar clip_id"}), 500
+        return jsonify({"message": "Clip ID já existente.", "clip_id": clip_data["clip_id"], "timestamp": clip_data["timestamp"]}), 200
 
 # @app.route("/lyrics/form", methods=["GET"])
 # def display_lyrics_form():

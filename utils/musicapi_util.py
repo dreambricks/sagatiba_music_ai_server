@@ -1,17 +1,28 @@
+import csv
+import os
 import http.client
 import json
 from time import sleep
+from datetime import datetime
 
-clip_id = None  # Variável global para armazenar o clip_id
+CLIP_ID_DIR = "storage"
+CLIP_ID_FILE = os.path.join(CLIP_ID_DIR, "clip_id.csv")
 
-def set_clip_id(new_clip_id):
-    """Define um novo clip_id para ser acessado globalmente."""
-    global clip_id
-    clip_id = new_clip_id
+# Atualização da função set_clip_id e get_clip_id para usar CSV
+def set_clip_id(clip_id, timestamp):
+    os.makedirs(CLIP_ID_DIR, exist_ok=True)  # Garante que a pasta existe
+    with open(CLIP_ID_FILE, "a", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([clip_id, timestamp])
 
 def get_clip_id():
-    """Retorna o último clip_id salvo."""
-    return clip_id
+    if os.path.exists(CLIP_ID_FILE):
+        with open(CLIP_ID_FILE, "r") as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+            if rows:
+                return {"clip_id": rows[-1][0], "timestamp": rows[-1][1]}  # Retorna o último clip_id salvo
+    return None
 
 def get_task_id(data):
     try:
@@ -124,6 +135,21 @@ def create_music2(lyrics):
 
 def create_music3(lyrics):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
+    clip_data = get_clip_id()
+    clip_id = clip_data.get("clip_id") if clip_data else None
+    
+    if clip_id is None:
+        response = upload_song(os.getenv("HOST_URL"))
+        if response:
+            try:
+                data = json.loads(response)
+                if data.get("code") == 200 and "clip_id" in data:
+                    clip_id = data["clip_id"]
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    set_clip_id(clip_id, timestamp)
+            except json.JSONDecodeError:
+                return "[ERROR] Erro ao decodificar resposta JSON do upload_song"
+    
     payload = json.dumps({
         "task_type": "extend_upload_music",
         "custom_mode": True,
