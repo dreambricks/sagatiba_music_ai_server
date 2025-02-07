@@ -215,7 +215,7 @@ def process_music_tasks():
 def get_lyrics_and_audio():
     """Retorna as letras da música e os arquivos de áudio associados ao task_id."""
     task_id = request.args.get("task_id")
-
+    host_url = os.getenv("HOST_URL")
     if not task_id:
         return jsonify({"error": "Task ID is required"}), 400
 
@@ -230,7 +230,7 @@ def get_lyrics_and_audio():
         # Diretório onde os áudios estão armazenados
         audio_dir = "static/mp3/"
         audio_files = [
-            f"{request.host_url}{audio_dir}{file}"
+            f"{host_url}{audio_dir}{file}"
             for file in os.listdir(audio_dir)
             if file.startswith(f"sagatiba_{task_id}_")
         ]
@@ -313,12 +313,13 @@ def request_audio(json):
 
         if isinstance(audio_urls, list) and len(audio_urls) > 0:
             file_paths = [store_audio(url, task_id) for url in audio_urls]
+            local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
             logger.info(f"Áudios armazenados: {file_paths}")
 
             # Gerar link para o usuário acessar no frontend
             message_url = f"{host_url}mensagem?id={task_id}"
             send_whatsapp_download_message(message_url, phone)
-            emit('audio_response', {'audio_urls': file_paths}, namespace='/')
+            emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
             return
 
         socketio.sleep(10)
