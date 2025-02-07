@@ -220,30 +220,39 @@ def process_music_tasks():
     if not phone:
         return jsonify({"error": "Phone number is required"}), 400
 
-    raw_task = dequeue_task()  # Retira a primeira tarefa FIFO
-    if not raw_task:
-        return jsonify({"error": "No tasks in the queue"}), 404
+    while True:
+        raw_task = dequeue_task()  # Retira a primeira tarefa FIFO
+        if not raw_task:
+            return jsonify({"error": "No tasks in the queue"}), 404
 
-    try:
-        task_data = json.loads(raw_task.decode("utf-8"))  
-    except json.JSONDecodeError:
-        return jsonify({"error": "Invalid task data format"}), 500
+        try:
+            task_data = json.loads(raw_task.decode("utf-8"))  
+        except json.JSONDecodeError:
+            return jsonify({"error": "Invalid task data format"}), 500
 
-    lyrics = task_data["lyrics"]
-    task_phone = task_data["phone"]
+        lyrics = task_data["lyrics"]
+        task_phone = task_data["phone"]
 
-    # Verifica se a música já foi processada para este telefone e adiciona novo task_id
-    existing_task_ids = lyrics_db.lrange(f"lyrics_store:{phone}", 0, -1)
+        # Se a tarefa retirada não pertence ao telefone, reenfileira e busca outra
+        if task_phone != phone:
+            enqueue_task(task_data)  # Coloca de volta no final da fila
+            logger.info(f"[TASK] Task for {task_phone} requeued, searching for correct task.")
+            continue  # Continua a busca pela tarefa correta
 
-    if existing_task_ids and len(existing_task_ids) > 0:
-        decoded_task_ids = [task_id.decode("utf-8") for task_id in existing_task_ids]
-        logger.info(f"Existing task IDs for {phone}: {decoded_task_ids}")
+        # Verifica se a música já foi processada para este telefone e adiciona novo task_id
+        existing_task_ids = lyrics_db.lrange(f"lyrics_store:{phone}", 0, -1)
 
+        if existing_task_ids and len(existing_task_ids) > 0:
+            decoded_task_ids = [task_id.decode("utf-8") for task_id in existing_task_ids]
+            logger.info(f"Existing task IDs for {phone}: {decoded_task_ids}")
+            
+            # Se o telefone já tem um task_id em andamento, impede reprocessamento
+            if phone in task_db.hkeys("processed_tasks"):
+                return jsonify({"error": "A task is already in progress for this phone"}), 409
 
-    # Cria a música e retorna um task_id
-    task_id = create_music(lyrics)
+        # Cria a música e retorna um task_id
+        task_id = create_music(lyrics)
 
-    if task_phone == phone:
         if task_id:
             # Salva task_id no Redis (Banco de tarefas)
             task_db.hset("processed_tasks", phone, task_id)
@@ -251,15 +260,11 @@ def process_music_tasks():
             # Salva a música no Redis (Banco de letras/músicas)
             lyrics_db.rpush(f"lyrics_store:{phone}", task_id)  # Adiciona um novo task_id na lista
             lyrics_db.hset("lyrics_store", task_id, lyrics)  # Salva as letras associadas ao task_id
-            lyrics_db.hset("lyrics_store", phone, task_id) # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
+            lyrics_db.hset("lyrics_store", phone, task_id)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
 
             return jsonify({"task_id": task_id}), 200
         else:
             return jsonify({"error": "Failed to create music task"}), 500
-    else:
-        # Se o telefone não bate, envia o áudio ao telefone correto
-        request_audio({"task_id": task_id, "phone": task_phone})
-        return jsonify({"status": "Audio sent to original requester"}), 202
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
@@ -371,10 +376,10 @@ def request_audio(json):
             emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
             return
 
-        if attempts in [20, 50] and upload_triggered < 2:
-            logger.info(f"[SOCKET] Tentativas {attempts}, acionando scheduled_upload")
-            scheduled_upload()
-            upload_triggered += 1
+        # if attempts in [20, 50] and upload_triggered < 2:
+        #     logger.info(f"[SOCKET] Tentativas {attempts}, acionando scheduled_upload")
+        #     scheduled_upload()
+        #     upload_triggered += 1
 
         socketio.sleep(10)
         attempts += 1
