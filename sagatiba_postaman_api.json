@@ -1,0 +1,254 @@
+{
+	"info": {
+		"_postman_id": "e4ce3f6e-7a50-416c-a6e9-b2c8befb1cfb",
+		"name": "Sagatiba Music API - v3",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "40024487",
+		"_collection_link": "https://projetos-db.postman.co/workspace/1a4375e5-47a8-444d-a74f-5ffc6801673e/collection/40024487-e4ce3f6e-7a50-416c-a6e9-b2c8befb1cfb?action=share&source=collection_link&creator=40024487"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/alive",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"alive"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Generate Lyrics",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "destination",
+							"value": "José",
+							"type": "text"
+						},
+						{
+							"key": "invite_options",
+							"value": "SEXTOU",
+							"type": "text"
+						},
+						{
+							"key": "weekdays",
+							"value": "Sexta-Feira",
+							"type": "text"
+						},
+						{
+							"key": "message",
+							"value": "Vamos beber?",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/lyrics",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"lyrics"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Enqueue Lyrics",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"lyrics\": \"**Título: Sextou com Cachaça**\\n\\n**Introdução:**\\nÉ sexta-feira, a animação chegou,  \\nJosé tá na pista, a festa já começou.  \\nCom um sorriso largo e uma dose na mão,  \\nVamos celebrar, deixar a vida em canção!\\n\\n**Verso:**\\nO relógio bateu, a rotina se foi,  \\nA cachaça sagatiba faz brilhar o farol,  \\nOs amigos reunidos, o riso é geral,  \\nBateu a saudade, mas a gente é legal.\\n\\n**Refrão:**\\nVamos beber, levantar o copo pra cima!  \\nCachaça e alegria, a noite se anima.  \\nCom responsabilidade, vamos celebrar,  \\nSextou com sabor, a vida é pra amar!\",\n    \"phone\": \"11996984576\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/lyrics/generate",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"lyrics",
+						"generate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Process Lyrics Task",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"11996984576\"\n}   "
+				},
+				"url": {
+					"raw": "{{base_url}}/lyrics/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"lyrics",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Request Audio via WebSocket",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{ws_host}}/socket.io?EIO=4&transport=websocket",
+					"host": [
+						"{{ws_host}}"
+					],
+					"path": [
+						"socket.io"
+					],
+					"query": [
+						{
+							"key": "EIO",
+							"value": "4"
+						},
+						{
+							"key": "transport",
+							"value": "websocket"
+						}
+					]
+				},
+				"description": "WebSocket connection for audio requests."
+			},
+			"response": []
+		},
+		{
+			"name": "Download Audio",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/audio/download?audio_url=https://example.com/audio.mp3",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"audio",
+						"download"
+					],
+					"query": [
+						{
+							"key": "audio_url",
+							"value": "https://example.com/audio.mp3"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Lyrics and Audio",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/lyrics/get?task_id=3d942c29-cebf-4584-a098-354c5e9826fa",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"lyrics",
+						"get"
+					],
+					"query": [
+						{
+							"key": "task_id",
+							"value": "3d942c29-cebf-4584-a098-354c5e9826fa",
+							"description": "Task ID to fetch lyrics and associated audio files"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Clip Id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/check/clip_id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"check",
+						"clip_id"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Post Clip Id",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/check/clip_id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"check",
+						"clip_id"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5001",
+			"type": "string"
+		},
+		{
+			"key": "ws_host",
+			"value": "localhost:5001",
+			"type": "string"
+		}
+	]
+}

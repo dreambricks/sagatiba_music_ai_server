@@ -165,7 +165,6 @@ cython_debug/
 
 .pem
 /priv
-test_socket.py
 
 /static/mp3
 storage

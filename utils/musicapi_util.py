@@ -101,8 +101,8 @@ def upload_song(host_url):
     payload_url = f"{host_url}static/trechos/vai_la_02.mp3"
     print(payload_url)
     payload = json.dumps({
-        "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
-        # "url": payload_url
+        # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
+        "url": payload_url
     })
     headers = {
         'Content-Type': 'application/json',
