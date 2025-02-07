@@ -81,7 +81,8 @@ def create_persona():
 
 def upload_song(host_url):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
-    payload_url = f"{host_url}trechos/vai_la_02.mp3"
+    payload_url = f"{host_url}static/trechos/vai_la_02.mp3"
+    print(payload_url)
     payload = json.dumps({
         # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
         "url": payload_url
