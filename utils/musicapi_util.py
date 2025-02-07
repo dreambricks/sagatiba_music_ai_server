@@ -128,9 +128,9 @@ def create_music3(lyrics):
         "task_type": "extend_upload_music",
         "custom_mode": True,
         "prompt": lyrics,
-        "tags": "sertanejo, female voices, back vocals, 30 seconds long",
+        "tags": "female voices only, sertanejo, back vocals, 30 seconds long",
         "continue_clip_id": clip_id,
-        "continue_at": 35,
+        "continue_at": 24,
         "mv": "sonic-v4"
     })
     headers = {
