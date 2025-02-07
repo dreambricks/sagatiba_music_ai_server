@@ -24,6 +24,12 @@ def get_clip_id():
                 return {"clip_id": rows[-1][0], "timestamp": rows[-1][1]}  # Retorna o último clip_id salvo
     return None
 
+# Função para limpar o arquivo clip_id.csv diariamente
+def clear_clip_id_file():
+    if os.path.exists(CLIP_ID_FILE):
+        os.remove(CLIP_ID_FILE)
+        return "[SCHEDULER] Arquivo clip_id.csv limpo antes de iniciar o scheduler."
+
 def get_task_id(data):
     try:
         # Extract the task_id value
@@ -95,8 +101,8 @@ def upload_song(host_url):
     payload_url = f"{host_url}static/trechos/vai_la_02.mp3"
     print(payload_url)
     payload = json.dumps({
-        # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
-        "url": payload_url
+        "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
+        # "url": payload_url
     })
     headers = {
         'Content-Type': 'application/json',
