@@ -371,7 +371,7 @@ def request_audio(json):
             local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
             logger.info(f"Áudios armazenados: {file_paths}")
 
-            message_url = f"{host_url}mensagem?id={task_id}"
+            message_url = f"https://seguenasaga.sagatiba.com/mensagem?id={task_id}"
             send_whatsapp_download_message(message_url, phone)
             emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
             return
