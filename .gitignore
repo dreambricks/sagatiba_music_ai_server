@@ -168,3 +168,4 @@ cython_debug/
 test_socket.py
 
 /static/mp3
+/storage
