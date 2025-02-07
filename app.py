@@ -345,13 +345,13 @@ def request_audio(json):
         return
 
     attempts = 0
+    upload_triggered = 0
     while attempts < 70:
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
-        
         audio_urls = get_music(task_id)
-        
+
         if isinstance(audio_urls, str):
             if audio_urls.startswith("Status"):  # Se for um status, não interrompe o loop
                 logger.info(f"Status recebido para task_id={task_id}: {audio_urls}")
@@ -366,11 +366,15 @@ def request_audio(json):
             local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
             logger.info(f"Áudios armazenados: {file_paths}")
 
-            # Gerar link para o usuário acessar no frontend
             message_url = f"{host_url}mensagem?id={task_id}"
             send_whatsapp_download_message(message_url, phone)
             emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
             return
+
+        if attempts in [20, 50] and upload_triggered < 2:
+            logger.info(f"[SOCKET] Tentativas {attempts}, acionando scheduled_upload")
+            scheduled_upload()
+            upload_triggered += 1
 
         socketio.sleep(10)
         attempts += 1

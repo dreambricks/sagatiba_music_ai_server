@@ -168,4 +168,5 @@ cython_debug/
 test_socket.py
 
 /static/mp3
-/storage
+storage
+storage/clip_id.csv
