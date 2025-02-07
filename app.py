@@ -84,6 +84,7 @@ scheduler.add_job(
     id='scheduled_upload_morning',
     func=scheduled_upload,
     trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
+    next_run_time=datetime.now(),
     replace_existing=True
 )
 scheduler.add_job(
