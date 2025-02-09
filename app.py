@@ -53,7 +53,7 @@ limiter = Limiter(
 scheduler = APScheduler()
 
 
-def daily_upload():
+def worker_upload_song():
     """
     Tarefa agendada que faz upload de música e armazena o clip_id.
     """
@@ -78,7 +78,7 @@ def daily_upload():
 
 # Adiciona a tarefa ao scheduler para rodar diariamente
 # scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', minutes=1)
-scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', hours=24, next_run_time=datetime.now())
+scheduler.add_job(id='daily_upload', func=worker_upload_song, trigger='interval', hours=24, next_run_time=datetime.now())
 scheduler.start()
 
 
@@ -101,29 +101,6 @@ def check_clip_id():
     else:
         return jsonify({"error": "clip_id ainda não foi gerado"}), 404
 
-
-# @app.route("/lyrics/form", methods=["GET"])
-# def display_lyrics_form():
-#     """Renderiza o formulário para geração de letras."""
-#     logger.info("Rendering lyrics generation form.")
-#     return render_template("form-generate-lyrics-test.html")
-
-# @app.route("/lyrics/display", methods=["GET"])
-# def display_lyrics():
-#     """Exibe a página com as letras geradas."""
-#     lyrics = request.args.get('lyrics')
-#     phone = request.args.get('phone') 
-
-#     return render_template("lyrics-generated-test.html", lyrics=lyrics)
-
-# @app.route("/lyrics/submit", methods=["POST"])
-# def submit_lyrics():
-#     """Recebe as letras via formulário POST e exibe na página de letras."""
-#     lyrics = request.form.get('lyrics', '')
-#     if lyrics:
-#         return render_template("lyrics-generated-test.html", lyrics=lyrics)
-#     else:
-#         return render_template("lyrics-generated-test.html", lyrics="Nenhuma letra foi enviada.")
 
 @app.route("/lyrics", methods=["POST"])
 #@limiter.limit("1 per 5 minutes")
@@ -251,40 +228,11 @@ def get_lyrics_and_audio():
         return jsonify({"error": "Internal server error"}), 500
 
 
-
-# @app.route("/lyrics/generate", methods=["GET"])
-# def generate_task_id():
-#     """Generate a task ID for the provided lyrics and return as JSON."""
-#     lyrics = request.args.get("lyrics")
-#     if not lyrics:
-#         return jsonify({"error": "Lyrics parameter is missing"}), 400
-
-#     task_id = create_music(lyrics)
-#     if task_id:
-#         return task_id
-#         # return jsonify({"task_id": task_id}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
-#     else:
-#         return jsonify({"error": "Failed to create task ID"}), 500
-
-# @app.route("/lyrics/audio", methods=["GET"])
-# def get_audio():
-#     """Returns audio URL or error status."""
-#     task_id = request.args.get('task_id')
-#     if not task_id:
-#         return jsonify({"error": "Task ID is required"}), 400
-
-#     audio_url = get_music(task_id)
-#     if audio_url:
-#         return audio_url
-#         # return jsonify({"audio_url": audio_url}), 200
-#     else:
-#         return jsonify({"error": "Audio generation pending"}), 202
-
-
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
-    
+
+    MAX_TRIES = 50
     logger.info(f"Recebida requisição de áudio: {json}")  # Log dos dados de entrada
 
     task_id = json.get('task_id')
@@ -302,7 +250,7 @@ def request_audio(json):
         return
 
     attempts = 0
-    while attempts < 70:
+    while attempts < MAX_TRIES:
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
@@ -331,7 +279,7 @@ def request_audio(json):
         socketio.sleep(10)
         attempts += 1
 
-    logger.error(f"Falha ao gerar áudio para task_id={task_id} após 70 tentativas")
+    logger.error(f"Falha ao gerar áudio para task_id={task_id} após {MAX_TRIES} tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
 
@@ -441,10 +389,6 @@ def store_audio(url, task_id, max_size=1177*1024):
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Erro ao baixar áudio: {e}")
-        return jsonify({"error": str(e)}), 500
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 
