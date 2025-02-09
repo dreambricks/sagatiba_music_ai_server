@@ -4,6 +4,8 @@ import requests
 import time
 import redis
 import re
+import json
+
 from datetime import datetime
 
 from flask import Flask, request, jsonify, send_file
@@ -50,6 +52,7 @@ limiter = Limiter(
 
 scheduler = APScheduler()
 
+
 def daily_upload():
     """
     Tarefa agendada que faz upload de música e armazena o clip_id.
@@ -72,15 +75,18 @@ def daily_upload():
         except json.JSONDecodeError:
             logger.error(f"[WORKER] Erro ao decodificar JSON: {response}")
 
+
 # Adiciona a tarefa ao scheduler para rodar diariamente
 # scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', minutes=1)
 scheduler.add_job(id='daily_upload', func=daily_upload, trigger='interval', hours=24, next_run_time=datetime.now())
 scheduler.start()
 
+
 @app.route('/alive', methods=['GET'])
 def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
+
 
 @app.route("/check/clip_id", methods=["GET"])
 def check_clip_id():
@@ -161,7 +167,6 @@ def generate_task_id():
     logger.info(f"Task enqueued for phone: {phone}")
     return jsonify({"status": "Your task has been enqueued"}), 202
 
-import json
 
 @app.route("/lyrics/process", methods=["POST"])
 def process_music_tasks():
@@ -210,6 +215,7 @@ def process_music_tasks():
         # Se o telefone não bate, envia o áudio ao telefone correto
         request_audio({"task_id": task_id, "phone": task_phone})
         return jsonify({"status": "Audio sent to original requester"}), 202
+
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
@@ -274,6 +280,7 @@ def get_lyrics_and_audio():
 #     else:
 #         return jsonify({"error": "Audio generation pending"}), 202
 
+
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
@@ -299,7 +306,6 @@ def request_audio(json):
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
-        
         audio_urls = get_music(task_id)
         
         if isinstance(audio_urls, str):
@@ -327,6 +333,7 @@ def request_audio(json):
 
     logger.error(f"Falha ao gerar áudio para task_id={task_id} após 70 tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
+
 
 @app.route("/audio/download", methods=["GET"])
 def download_audio():
@@ -377,6 +384,7 @@ def download_audio():
 #     except requests.exceptions.RequestException as e:
 #         logger.error(f"Request failed: {e}")
 #         return jsonify({"error": str(e)}), 500
+
 
 def get_task_id_from_url(url):
     """
@@ -435,10 +443,10 @@ def store_audio(url, task_id, max_size=1177*1024):
         logger.error(f"Erro ao baixar áudio: {e}")
         return jsonify({"error": str(e)}), 500
 
-    
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
@@ -446,11 +454,15 @@ def enqueue_task(lyrics, phone):
     logger.info(f"Enqueuing task: {task_data}")
     task_db.rpush('lyrics_queue', task_data)
 
+
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
     return task_db.lpop('lyrics_queue')
 
+
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
-    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
+    if os.getenv('LOCAL_SERVER'):
+        socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    else:
+        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
