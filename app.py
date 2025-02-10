@@ -4,6 +4,8 @@ import requests
 import time
 import redis
 import re
+import json
+
 from datetime import datetime
 
 from flask import Flask, request, jsonify, send_file
@@ -108,6 +110,7 @@ scheduler.add_job(
 clear_clip_id_file()
 scheduler.start()
 
+
 @app.route('/alive', methods=['GET'])
 def health_check():
     logger.info("Alive check endpoint accessed.")
@@ -211,7 +214,6 @@ def generate_task_id():
     logger.info(f"Task enqueued for phone: {phone}")
     return jsonify({"status": "Your task has been enqueued"}), 202
 
-import json
 
 @app.route("/lyrics/process", methods=["POST"])
 def process_music_tasks():
@@ -266,6 +268,7 @@ def process_music_tasks():
         else:
             return jsonify({"error": "Failed to create music task"}), 500
 
+
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
     """Retorna as letras da música e os arquivos de áudio associados ao task_id."""
@@ -300,39 +303,11 @@ def get_lyrics_and_audio():
         return jsonify({"error": "Internal server error"}), 500
 
 
-
-# @app.route("/lyrics/generate", methods=["GET"])
-# def generate_task_id():
-#     """Generate a task ID for the provided lyrics and return as JSON."""
-#     lyrics = request.args.get("lyrics")
-#     if not lyrics:
-#         return jsonify({"error": "Lyrics parameter is missing"}), 400
-
-#     task_id = create_music(lyrics)
-#     if task_id:
-#         return task_id
-#         # return jsonify({"task_id": task_id}), 201 #(JULIO - APLICAR ESSE TIPO DE RESPOSTA NA PAGINA OFICIAL)
-#     else:
-#         return jsonify({"error": "Failed to create task ID"}), 500
-
-# @app.route("/lyrics/audio", methods=["GET"])
-# def get_audio():
-#     """Returns audio URL or error status."""
-#     task_id = request.args.get('task_id')
-#     if not task_id:
-#         return jsonify({"error": "Task ID is required"}), 400
-
-#     audio_url = get_music(task_id)
-#     if audio_url:
-#         return audio_url
-#         # return jsonify({"audio_url": audio_url}), 200
-#     else:
-#         return jsonify({"error": "Audio generation pending"}), 202
-
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
-    
+
+    MAX_TRIES = 50
     logger.info(f"Recebida requisição de áudio: {json}")  # Log dos dados de entrada
 
     task_id = json.get('task_id')
@@ -351,7 +326,7 @@ def request_audio(json):
 
     attempts = 0
     upload_triggered = 0
-    while attempts < 70:
+    while attempts < MAX_TRIES:
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
 
@@ -384,8 +359,9 @@ def request_audio(json):
         socketio.sleep(10)
         attempts += 1
 
-    logger.error(f"Falha ao gerar áudio para task_id={task_id} após 70 tentativas")
+    logger.error(f"Falha ao gerar áudio para task_id={task_id} após {MAX_TRIES} tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
+
 
 @app.route("/audio/download", methods=["GET"])
 def download_audio():
@@ -436,6 +412,7 @@ def download_audio():
 #     except requests.exceptions.RequestException as e:
 #         logger.error(f"Request failed: {e}")
 #         return jsonify({"error": str(e)}), 500
+
 
 def get_task_id_from_url(url):
     """
@@ -494,10 +471,6 @@ def store_audio(url, task_id, max_size=1177*1024):
         logger.error(f"Erro ao baixar áudio: {e}")
         return jsonify({"error": str(e)}), 500
 
-    
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request failed: {e}")
-        return jsonify({"error": str(e)}), 500
 
 def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
@@ -505,11 +478,15 @@ def enqueue_task(lyrics, phone):
     logger.info(f"Enqueuing task: {task_data}")
     task_db.rpush('lyrics_queue', task_data)
 
+
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
     return task_db.lpop('lyrics_queue')
 
+
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
-    # socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
+    if os.getenv('LOCAL_SERVER'):
+        socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    else:
+        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
