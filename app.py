@@ -13,8 +13,8 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_apscheduler import APScheduler
-from apscheduler.triggers.cron import CronTrigger
+from flask_apscheduler import APScheduler # type: ignore
+from apscheduler.triggers.cron import CronTrigger # type: ignore
 
 from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id, clear_clip_id_file
 from utils.openai_util import moderation_ok, generate_lyrics
@@ -39,9 +39,10 @@ CORS(app)
 # Configuração dos bancos de dados Redis
 task_db = redis.Redis(host='localhost', port=6379, db=0)   # Banco para enfileiramento de tarefas
 lyrics_db = redis.Redis(host='localhost', port=6379, db=1) # Banco para armazenamento das letras de músicas
-
 # Atualiza o Redis URL apenas para o limiter, apontando para db=2
 limiter_redis_url = "redis://localhost:6379/2"
+error_db = redis.Redis(host='localhost', port=6379, db=3) 
+
 
 # Configuração do Rate Limiter no DB 2
 limiter = Limiter(
@@ -302,58 +303,63 @@ def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
 
     MAX_TRIES = 50
-    logger.info(f"Recebida requisição de áudio: {json}")  # Log dos dados de entrada
+    RETRY_INTERVAL = 10  # Segundos entre tentativas
+    logger.info(f"[SOCKET] Requisição recebida: {json}")
 
     task_id = json.get('task_id')
-    phone = json.get('phone')  # Obtém o número de telefone
-    host_url = os.getenv("HOST_URL")  # Obtém a URL do host para envio
+    phone = json.get('phone')
+    host_url = os.getenv("HOST_URL")
 
+    # Validação dos parâmetros obrigatórios
     if not task_id:
-        logger.warning("Requisição sem Task ID")
+        logger.warning("[SOCKET] Requisição sem Task ID")
         emit('error_message', {'error': 'Task ID is required', 'code': 400}, namespace='/')
         return
 
     if not phone:
-        logger.warning("Requisição sem número de telefone")
+        logger.warning("[SOCKET] Requisição sem número de telefone")
         emit('error_message', {'error': 'Phone number is required', 'code': 400}, namespace='/')
         return
 
-    attempts = 0
-    # upload_triggered = 0
-    while attempts < MAX_TRIES:
-        logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
-        emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
+    for attempt in range(1, MAX_TRIES + 1):
+        logger.info(f"[SOCKET] Tentativa {attempt}/{MAX_TRIES}: buscando áudios para task_id={task_id}")
+        emit('message', {'message': f"Tentativa {attempt}", 'code': 204}, namespace='/')
 
         audio_urls = get_music(task_id)
 
         if isinstance(audio_urls, str):
-            if audio_urls.startswith("Status"):  # Se for um status, não interrompe o loop
-                logger.info(f"Status recebido para task_id={task_id}: {audio_urls}")
+            if audio_urls.startswith("Status"):
+                logger.info(f"[SOCKET] Status recebido para task_id={task_id}: {audio_urls}")
                 emit('message', {'status': audio_urls}, namespace='/')
-            else:  # Se for um erro real, interrompe o loop e responde
-                logger.error(f"Erro ao obter áudio para task_id={task_id}: {audio_urls}")
+            else:
+                logger.error(f"[SOCKET] Erro ao obter áudio para task_id={task_id}: {audio_urls}")
+
+                # Salva erro para futura consulta via endpoint de status
+                save_audio_generation_error(task_id, phone, error_message=audio_urls)
+
+                # Tenta reprocessar o upload apenas se ainda houver tentativas restantes
+                if attempt < MAX_TRIES:
+                    logger.info(f"[SOCKET] Acionando worker_upload_song() para task_id={task_id} após erro.")
+                    worker_upload_song()
+
                 emit('error_message', {'error': audio_urls, 'code': 500}, namespace='/')
                 return
 
-        if isinstance(audio_urls, list) and len(audio_urls) > 0:
+        if isinstance(audio_urls, list) and audio_urls:
             file_paths = [store_audio(url, task_id) for url in audio_urls]
             local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
-            logger.info(f"Áudios armazenados: {file_paths}")
+            logger.info(f"[SOCKET] Áudios armazenados: {file_paths}")
 
             message_url = f"https://seguenasaga.sagatiba.com/mensagem?id={task_id}"
             send_whatsapp_download_message(message_url, phone)
             emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
             return
 
-        # if attempts in [20, 50] and upload_triggered < 2:
-        #     logger.info(f"[SOCKET] Tentativas {attempts}, acionando worker_upload_song")
-        #     worker_upload_song()
-        #     upload_triggered += 1
+        socketio.sleep(RETRY_INTERVAL)
 
-        socketio.sleep(10)
-        attempts += 1
-
-    logger.error(f"Falha ao gerar áudio para task_id={task_id} após {MAX_TRIES} tentativas")
+    # Se as tentativas acabarem sem sucesso, salva a falha para consulta futura
+    logger.error(f"[SOCKET] Falha ao gerar áudio para task_id={task_id} após {MAX_TRIES} tentativas")
+    save_audio_generation_error(task_id, phone, error_message="Exceeded max retries without success.")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
 @app.route("/audio/download", methods=["GET"])
@@ -461,6 +467,17 @@ def store_audio(url, task_id, max_size=1177*1024):
     except requests.exceptions.RequestException as e:
         logger.error(f"Erro ao baixar áudio: {e}")
         return jsonify({"error": str(e)}), 500
+
+def save_audio_generation_error(task_id, phone, error_message):
+    """ Salva informações sobre falhas na geração de áudio no Redis """
+    error_data = {
+        "task_id": task_id,
+        "phone": phone,
+        "error_message": error_message,
+        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    error_db.hset("audio_generation_errors", task_id, json.dumps(error_data))
+    logger.error(f"[ERROR] Erro salvo para task_id={task_id}: {error_message}")
 
 def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
