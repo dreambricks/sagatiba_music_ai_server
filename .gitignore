@@ -169,3 +169,4 @@ cython_debug/
 /static/mp3
 storage
 storage/clip_id.csv
+nohup.out

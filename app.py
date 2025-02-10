@@ -25,11 +25,17 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("app.log", encoding="utf-8"),
+        logging.FileHandler("app.log", encoding="utf-8", mode="a"),
         logging.StreamHandler()
-    ]
+    ],
+    force=True 
 )
 logger = logging.getLogger(__name__)
+
+# Força a escrita imediata dos logs no arquivo
+for handler in logger.handlers:
+    if isinstance(handler, logging.FileHandler):
+        handler.flush()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
@@ -491,6 +497,7 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
+    logger.info("Teste de log escrito no app.log")
     if os.getenv('LOCAL_SERVER'):
         socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
     else:
