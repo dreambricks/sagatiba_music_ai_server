@@ -110,27 +110,31 @@ def upload_song(host_url):
     return result
 
 def create_music2(lyrics):
-    logger.info("Criando música 2")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         "task_type": "persona_music",
         "custom_mode": True,
         "prompt": lyrics,
-        "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-        "persona_id": "804f9d62-bef4-436d-813d-48fc54847e8e",
-        "continue_clip_id": "838d8482-10fe-475b-8ae4-cae5eea5c98e",
-        "mv": "sonic-v3-5"
+        #"tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
+        #"persona_id": "3c480613-4ec4-44c8-895f-080e8c683964",  # generated in the API persona MM2
+        #"continue_clip_id": "33fae5fb-f72c-4251-a9b4-0167f23699ad",
+        "tags": "sertanejo, two female voices, back vocals",
+        "persona_id": "c0de1239-534f-4cdf-88aa-8f728b1515e2",  # generated using Suno persona: SunoPersonaI
+        "continue_clip_id": "8c0e2762-2ea3-4cfe-85b6-8264200a29cd",
+        "mv": "sonic-v4"
     })
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
     }
+
     conn.request("POST", "/api/v1/sonic/create", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    result = data.decode("utf-8")
-    logger.info(f"Resposta da API para create_music2: {result}")
+    result = json.loads(data.decode("utf-8"))
+    print(result)
     return get_task_id(result)
+
 
 def create_music3(lyrics):
     logger.info("Criando música 3")
@@ -205,7 +209,7 @@ def create_music3(lyrics):
         return get_task_id(result)
 
 def create_music(lyrics):
-    return create_music3(lyrics)
+    return create_music2(lyrics)
 
 def get_music(task_id):
     logger.info(f"Buscando música para task_id: {task_id}")
