@@ -16,7 +16,6 @@ from flask_limiter.util import get_remote_address
 from flask_apscheduler import APScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-
 from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id, clear_clip_id_file
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
@@ -54,7 +53,7 @@ limiter = Limiter(
 
 scheduler = APScheduler()
 
-def scheduled_upload():
+def worker_upload_song():
     """
     Tarefa agendada que faz upload de música e armazena o clip_id com data e hora em um CSV.
     """
@@ -87,15 +86,15 @@ def clear_task_db():
 
 # Adicionando agendamentos
 scheduler.add_job(
-    id='scheduled_upload_morning',
-    func=scheduled_upload,
+    id='worker_upload_song_morning',
+    func=worker_upload_song,
     trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
     next_run_time=datetime.now(),
     replace_existing=True
 )
 scheduler.add_job(
-    id='scheduled_upload_afternoon',
-    func=scheduled_upload,
+    id='worker_upload_song_afternoon',
+    func=worker_upload_song,
     trigger=CronTrigger(hour=16, minute=0),  # Roda todo dia às 04:00 PM
     replace_existing=True
 )
@@ -110,7 +109,6 @@ scheduler.add_job(
 clear_clip_id_file()
 scheduler.start()
 
-
 @app.route('/alive', methods=['GET'])
 def health_check():
     logger.info("Alive check endpoint accessed.")
@@ -120,15 +118,15 @@ def health_check():
 def check_clip_id():
     """
     GET: Retorna o valor atual do clip_id armazenado com data e hora.
-    Se não houver clip_id, aciona um scheduled_upload automaticamente.
+    Se não houver clip_id, aciona um worker_upload_song automaticamente.
     
-    POST: Executa scheduled_upload caso não haja clip_id salvo.
+    POST: Executa worker_upload_song caso não haja clip_id salvo.
     """
     if request.method == "GET":
         clip_data = get_clip_id()
         if not clip_data:
             logging.info("[CHECK] Nenhum clip_id encontrado. Executando upload automático.")
-            clip_data = scheduled_upload()
+            clip_data = worker_upload_song()
             if clip_data:  # Verifica se a função retornou um clip_id válido
                 return jsonify(clip_data), 200
             return jsonify({"error": "Falha ao gerar clip_id"}), 500  # Evita erro 500 sem resposta útil
@@ -140,7 +138,7 @@ def check_clip_id():
 
     elif request.method == "POST":
         logging.info("[CHECK] Nenhum clip_id encontrado. Executando upload via POST.")
-        clip_data = scheduled_upload()
+        clip_data = worker_upload_song()
         if clip_data:
             return jsonify({
                 "message": "Upload acionado.",
@@ -196,7 +194,6 @@ def call_generate_lyrics():
         logger.warning("Submitted text violates moderation rules.")
         return jsonify({"error": error_msg}), 403
 
-
 @app.route("/lyrics/generate", methods=["GET", "POST"])
 def generate_task_id():
     """Enfileira a geração de música para as letras fornecidas."""
@@ -213,7 +210,6 @@ def generate_task_id():
     enqueue_task(lyrics, phone)
     logger.info(f"Task enqueued for phone: {phone}")
     return jsonify({"status": "Your task has been enqueued"}), 202
-
 
 @app.route("/lyrics/process", methods=["POST"])
 def process_music_tasks():
@@ -268,7 +264,6 @@ def process_music_tasks():
         else:
             return jsonify({"error": "Failed to create music task"}), 500
 
-
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
     """Retorna as letras da música e os arquivos de áudio associados ao task_id."""
@@ -302,7 +297,6 @@ def get_lyrics_and_audio():
         logger.error(f"Erro ao buscar letras e áudios: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
-
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
@@ -325,7 +319,7 @@ def request_audio(json):
         return
 
     attempts = 0
-    upload_triggered = 0
+    # upload_triggered = 0
     while attempts < MAX_TRIES:
         logger.info(f"Tentativa {attempts + 1}: buscando áudios para task_id={task_id}")
         emit('message', {'message': f"Tentativa {attempts + 1}", 'code': 204}, namespace='/')
@@ -352,8 +346,8 @@ def request_audio(json):
             return
 
         # if attempts in [20, 50] and upload_triggered < 2:
-        #     logger.info(f"[SOCKET] Tentativas {attempts}, acionando scheduled_upload")
-        #     scheduled_upload()
+        #     logger.info(f"[SOCKET] Tentativas {attempts}, acionando worker_upload_song")
+        #     worker_upload_song()
         #     upload_triggered += 1
 
         socketio.sleep(10)
@@ -361,7 +355,6 @@ def request_audio(json):
 
     logger.error(f"Falha ao gerar áudio para task_id={task_id} após {MAX_TRIES} tentativas")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
-
 
 @app.route("/audio/download", methods=["GET"])
 def download_audio():
@@ -413,7 +406,6 @@ def download_audio():
 #         logger.error(f"Request failed: {e}")
 #         return jsonify({"error": str(e)}), 500
 
-
 def get_task_id_from_url(url):
     """
     Extracts the task_id from a given URL.
@@ -425,7 +417,6 @@ def get_task_id_from_url(url):
     pattern = re.compile(r'([a-f0-9-]{36})')  # Matches UUID-like patterns
     match = pattern.search(url)
     return match.group(1) if match else None
-
 
 def store_audio(url, task_id, max_size=1177*1024):
     """
@@ -471,18 +462,15 @@ def store_audio(url, task_id, max_size=1177*1024):
         logger.error(f"Erro ao baixar áudio: {e}")
         return jsonify({"error": str(e)}), 500
 
-
 def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
     task_data = json.dumps({"lyrics": lyrics, "phone": phone})
     logger.info(f"Enqueuing task: {task_data}")
     task_db.rpush('lyrics_queue', task_data)
 
-
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
     return task_db.lpop('lyrics_queue')
-
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
