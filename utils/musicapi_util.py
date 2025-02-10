@@ -110,6 +110,7 @@ def upload_song(host_url):
     return result
 
 def create_music2(lyrics):
+    logger.info("Criando música 2")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         "task_type": "persona_music",
@@ -132,7 +133,7 @@ def create_music2(lyrics):
     res = conn.getresponse()
     data = res.read()
     result = json.loads(data.decode("utf-8"))
-    print(result)
+    logger.info(f"Resposta da API para create_music2: {result}")
     return get_task_id(result)
 
 
