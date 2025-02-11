@@ -65,8 +65,8 @@ def worker_upload_song():
     Tarefa agendada que faz upload de música e armazena o clip_id com data e hora em um CSV.
     """
     now = datetime.now()
-    logging.info(f"[WORKER] Executando upload às {now.strftime('%Y-%m-%d %H:%M:%S')}")
-    
+    logger.info(f"[WORKER] Executing upload at {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
     host_url = os.getenv("HOST_URL")  # Usa a variável de ambiente
     response = upload_song(host_url)
 
@@ -77,19 +77,20 @@ def worker_upload_song():
                 clip_id = data["clip_id"]
                 timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
                 set_clip_id(clip_id, timestamp)
-                logging.info(f"[WORKER] Upload bem-sucedido! Clip ID salvo: {clip_id}")
+                logger.info(f"[WORKER] Successful Upload! Saved clip Id: {clip_id}")
                 return {"clip_id": clip_id, "timestamp": timestamp}  # Retorna os dados corretamente
             else:
-                logging.warning(f"[WORKER] Falha no upload: {data}")
+                logger.warning(f"[WORKER] Failed to upload: {data}")
+                # Salva erro para futura consulta via endpoint de status
+                save_system_error("UPLOAD_SONG_FAILED", f"clip_id_{now.strftime('%Y-%m-%d %H:%M:%S')}", f"Failed to upload: {data}")
         except json.JSONDecodeError:
-            logging.error(f"[WORKER] Erro ao decodificar JSON: {response}")
-
+            logger.error(f"[WORKER] Error decoding JSON: {response}")
     return None  # Retorna None se falhar
 
 # Função para limpar as tarefas do Redis
 def clear_task_db():
     task_db.flushdb()
-    logging.info("[SCHEDULER] Banco de tarefas do Redis limpo às 04:00 AM")
+    logger.info("[SCHEDULER] Redis task database cleaned at 04:00 AM")
 
 # Adicionando agendamentos
 scheduler.add_job(
@@ -132,11 +133,11 @@ def check_clip_id():
     if request.method == "GET":
         clip_data = get_clip_id()
         if not clip_data:
-            logging.info("[CHECK] Nenhum clip_id encontrado. Executando upload automático.")
+            logger.info("[CHECK] No clip_id found. Initiating automatic upload.")
             clip_data = worker_upload_song()
             if clip_data:  # Verifica se a função retornou um clip_id válido
                 return jsonify(clip_data), 200
-            return jsonify({"error": "Falha ao gerar clip_id"}), 500  # Evita erro 500 sem resposta útil
+            return jsonify({"error": "Failed to generate clip_id"}), 500  # Evita erro 500 sem resposta útil
         
         return jsonify({
             "clip_id": clip_data["clip_id"],
@@ -144,38 +145,15 @@ def check_clip_id():
         }), 200
 
     elif request.method == "POST":
-        logging.info("[CHECK] Nenhum clip_id encontrado. Executando upload via POST.")
+        logger.info("[CHECK] Nenhum clip_id encontrado. Executando upload via POST.")
         clip_data = worker_upload_song()
         if clip_data:
             return jsonify({
-                "message": "Upload acionado.",
+                "message": "Upload added.",
                 "clip_id": clip_data["clip_id"],
                 "timestamp": clip_data["timestamp"]
             }), 200
-        return jsonify({"error": "Falha ao gerar clip_id"}), 500
-
-# @app.route("/lyrics/form", methods=["GET"])
-# def display_lyrics_form():
-#     """Renderiza o formulário para geração de letras."""
-#     logger.info("Rendering lyrics generation form.")
-#     return render_template("form-generate-lyrics-test.html")
-
-# @app.route("/lyrics/display", methods=["GET"])
-# def display_lyrics():
-#     """Exibe a página com as letras geradas."""
-#     lyrics = request.args.get('lyrics')
-#     phone = request.args.get('phone') 
-
-#     return render_template("lyrics-generated-test.html", lyrics=lyrics)
-
-# @app.route("/lyrics/submit", methods=["POST"])
-# def submit_lyrics():
-#     """Recebe as letras via formulário POST e exibe na página de letras."""
-#     lyrics = request.form.get('lyrics', '')
-#     if lyrics:
-#         return render_template("lyrics-generated-test.html", lyrics=lyrics)
-#     else:
-#         return render_template("lyrics-generated-test.html", lyrics="Nenhuma letra foi enviada.")
+        return jsonify({"[CHECK] No clip_id found. Initiating upload via POST."}), 500
 
 @app.route("/lyrics", methods=["POST"])
 #@limiter.limit("1 per 5 minutes")
@@ -301,7 +279,7 @@ def get_lyrics_and_audio():
         }), 200
 
     except Exception as e:
-        logger.error(f"Erro ao buscar letras e áudios: {e}")
+        logger.error(f"Error retrieving lyrics and audio: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 @socketio.on('request_audio_url')
@@ -310,7 +288,7 @@ def request_audio(json):
 
     MAX_TRIES = 50
     RETRY_INTERVAL = 10  # Segundos entre tentativas
-    logger.info(f"[SOCKET] Requisição recebida: {json}")
+    logger.info(f"[SOCKET] Request received: {json}")
 
     task_id = json.get('task_id')
     phone = json.get('phone')
@@ -318,34 +296,35 @@ def request_audio(json):
 
     # Validação dos parâmetros obrigatórios
     if not task_id:
-        logger.warning("[SOCKET] Requisição sem Task ID")
+        logger.warning("[SOCKET] Request without Task ID")
         emit('error_message', {'error': 'Task ID is required', 'code': 400}, namespace='/')
         return
 
     if not phone:
-        logger.warning("[SOCKET] Requisição sem número de telefone")
+        logger.warning("[SOCKET] Request without phone number")
         emit('error_message', {'error': 'Phone number is required', 'code': 400}, namespace='/')
         return
 
     for attempt in range(1, MAX_TRIES + 1):
-        logger.info(f"[SOCKET] Tentativa {attempt}/{MAX_TRIES}: buscando áudios para task_id={task_id}")
-        emit('message', {'message': f"Tentativa {attempt}", 'code': 204}, namespace='/')
+        logger.info(f"[SOCKET] Attempt {attempt}/{MAX_TRIES}: searching for audio for task_id={task_id}")
+        emit('message', {'message': f"Attempt {attempt}", 'code': 204}, namespace='/')
 
         audio_urls = get_music(task_id)
 
         if isinstance(audio_urls, str):
             if audio_urls.startswith("Status"):
-                logger.info(f"[SOCKET] Status recebido para task_id={task_id}: {audio_urls}")
+                logger.info(f"[SOCKET] Status received for task_id={task_id}: {audio_urls}")
                 emit('message', {'status': audio_urls}, namespace='/')
             else:
-                logger.error(f"[SOCKET] Erro ao obter áudio para task_id={task_id}: {audio_urls}")
+                logger.error(f"[SOCKET] Error retrieving audio for task_id={task_id}: {audio_urls}")
 
                 # Salva erro para futura consulta via endpoint de status
-                save_audio_generation_error(task_id, phone, error_message=audio_urls)
+                save_system_error("API_NO_RESPONSE", f"task_id_{task_id}", "Music API isn't responding")
+
 
                 # Tenta reprocessar o upload apenas se ainda houver tentativas restantes
                 if attempt < MAX_TRIES:
-                    logger.info(f"[SOCKET] Acionando worker_upload_song() para task_id={task_id} após erro.")
+                    logger.info(f"[SOCKET] Triggering worker_upload_song() for task_id={task_id} after error.")
                     worker_upload_song()
 
                 emit('error_message', {'error': audio_urls, 'code': 500}, namespace='/')
@@ -354,7 +333,7 @@ def request_audio(json):
         if isinstance(audio_urls, list) and audio_urls:
             file_paths = [store_audio(url, task_id) for url in audio_urls]
             local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
-            logger.info(f"[SOCKET] Áudios armazenados: {file_paths}")
+            logger.info(f"[SOCKET] Audio files stored: {file_paths}")
 
             message_url = f"https://seguenasaga.sagatiba.com/mensagem?id={task_id}"
             send_whatsapp_download_message(message_url, phone)
@@ -364,8 +343,8 @@ def request_audio(json):
         socketio.sleep(RETRY_INTERVAL)
 
     # Se as tentativas acabarem sem sucesso, salva a falha para consulta futura
-    logger.error(f"[SOCKET] Falha ao gerar áudio para task_id={task_id} após {MAX_TRIES} tentativas")
-    save_audio_generation_error(task_id, phone, error_message="Exceeded max retries without success.")
+    logger.error(f"[SOCKET] Failed to generate audio for task_id={task_id} after {MAX_TRIES} attempts")
+    save_system_error("REQUEST_AUDIO", f"task_id_{task_id}", "Exceeded max retries without success.")
     emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
 
 @app.route("/audio/download", methods=["GET"])
@@ -456,7 +435,7 @@ def store_audio(url, task_id, max_size=1177*1024):
     try:
         response = requests.get(url, stream=True)
         if response.status_code != 200:
-            return jsonify({"error": "Failed to download file"}), 500
+            return jsonify({"error": "Failed to download audio file"}), 500
 
         file_size = 0
         with open(temp_path, "wb") as file:
@@ -471,19 +450,19 @@ def store_audio(url, task_id, max_size=1177*1024):
         return temp_path  # Retorna o caminho do arquivo salvo
 
     except requests.exceptions.RequestException as e:
-        logger.error(f"Erro ao baixar áudio: {e}")
+        logger.error(f"Failed to download audio file: {e}")
         return jsonify({"error": str(e)}), 500
 
-def save_audio_generation_error(task_id, phone, error_message):
+def save_system_error(context, identifier, error_message):
     """ Salva informações sobre falhas na geração de áudio no Redis """
     error_data = {
-        "task_id": task_id,
-        "phone": phone,
+        "context": context,
+        "identifier": identifier,
         "error_message": error_message,
         "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
-    error_db.hset("audio_generation_errors", task_id, json.dumps(error_data))
-    logger.error(f"[ERROR] Erro salvo para task_id={task_id}: {error_message}")
+    error_db.hset("system_errors", identifier, json.dumps(error_data))
+    logger.error(f"[ERROR] Error saved in context {context} for identifier={identifier}: {error_message}")
 
 def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando a letra e o telefone do usuário """
@@ -497,7 +476,6 @@ def dequeue_task():
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    logger.info("Teste de log escrito no app.log")
     if os.getenv('LOCAL_SERVER'):
         socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
     else:
