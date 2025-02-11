@@ -49,7 +49,6 @@ lyrics_db = redis.Redis(host='localhost', port=6379, db=1) # Banco para armazena
 limiter_redis_url = "redis://localhost:6379/2"
 error_db = redis.Redis(host='localhost', port=6379, db=3) 
 
-
 # Configuração do Rate Limiter no DB 2
 limiter = Limiter(
     app=app,
@@ -117,10 +116,46 @@ scheduler.add_job(
 clear_clip_id_file()
 scheduler.start()
 
-@app.route('/alive', methods=['GET'])
+@app.route('/check', methods=['GET'])
 def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
+
+@app.route("/check/status", methods=["GET"])
+def check_system_status():
+    """
+    Endpoint que retorna o status das principais operações do sistema.
+    Se houver erros, ele retorna uma lista com os problemas encontrados.
+    """
+
+    # Recupera todos os erros armazenados no Redis (DB 3)
+    errors = error_db.hgetall("system_errors")
+
+    if not errors:
+        return jsonify({
+            "status": "ok",
+            "message": "Everything's shiny, Cap'n!"
+        }), 200
+
+    # Converte os erros de JSON para um formato legível
+    error_list = []
+    for key, value in errors.items():
+        error_data = json.loads(value.decode("utf-8"))
+        error_list.append({
+            "error_id": key.decode("utf-8"),  # 🔹 Inclui a chave como identificador do erro
+            "context": error_data["context"],
+            "identifier": error_data["identifier"],
+            "error_message": error_data["error_message"],
+            "timestamp": error_data["timestamp"]
+        })
+
+
+    return jsonify({
+        "status": "error",
+        "message": "I've got a bad feeling about this...",
+        "errors": error_list
+    }), 500
+
 
 @app.route("/check/clip_id", methods=["GET", "POST"])
 def check_clip_id():
