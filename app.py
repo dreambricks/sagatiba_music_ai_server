@@ -206,6 +206,7 @@ def process_music_tasks():
     while True:
         raw_task = dequeue_task()  # Retira a primeira tarefa FIFO
         if not raw_task:
+            save_system_error("TASK_DEQUEUE_FAILED", f"phone_{phone}", f"No task enqueued for phone {phone} to be dequeued")
             return jsonify({"error": "No tasks in the queue"}), 404
 
         try:
@@ -247,6 +248,7 @@ def process_music_tasks():
 
             return jsonify({"task_id": task_id}), 200
         else:
+            save_system_error("NO_TASK_ID", f"phone_{phone}", f"No task_id returned for phone {phone} and lyrics {lyrics}")
             return jsonify({"error": "Failed to create music task"}), 500
 
 @app.route("/lyrics/get", methods=["GET"])
