@@ -16,7 +16,8 @@ from flask_limiter.util import get_remote_address
 from flask_apscheduler import APScheduler # type: ignore
 from apscheduler.triggers.cron import CronTrigger # type: ignore
 
-from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id, clear_clip_id_file
+from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id, clear_clip_id_file, \
+    get_music2
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
 
@@ -254,7 +255,7 @@ def process_music_tasks():
 
         # Se a tarefa retirada não pertence ao telefone, reenfileira e busca outra
         if task_phone != phone:
-            enqueue_task(task_data)  # Coloca de volta no final da fila
+            enqueue_task(lyrics, phone)  # Coloca de volta no final da fila
             logger.info(f"[TASK] Task for {task_phone} requeued, searching for correct task.")
             continue  # Continua a busca pela tarefa correta
 
@@ -274,12 +275,13 @@ def process_music_tasks():
 
         if task_id:
             # Salva task_id no Redis (Banco de tarefas)
-            task_db.hset("processed_tasks", phone, task_id)
+            task_id_r = str(task_id)
+            task_db.hset("processed_tasks", phone, task_id_r)
 
             # Salva a música no Redis (Banco de letras/músicas)
-            lyrics_db.rpush(f"lyrics_store:{phone}", task_id)  # Adiciona um novo task_id na lista
-            lyrics_db.hset("lyrics_store", task_id, lyrics)  # Salva as letras associadas ao task_id
-            lyrics_db.hset("lyrics_store", phone, task_id)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
+            lyrics_db.rpush(f"lyrics_store:{phone}", task_id_r)  # Adiciona um novo task_id na lista
+            lyrics_db.hset("lyrics_store", task_id_r, lyrics)  # Salva as letras associadas ao task_id
+            lyrics_db.hset("lyrics_store", phone, task_id_r)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
 
             return jsonify({"task_id": task_id}), 200
         else:
@@ -346,7 +348,7 @@ def request_audio(json):
         logger.info(f"[SOCKET] Attempt {attempt}/{MAX_TRIES}: searching for audio for task_id={task_id}")
         emit('message', {'message': f"Attempt {attempt}", 'code': 204}, namespace='/')
 
-        audio_urls = get_music(task_id)
+        audio_urls = get_music2(task_id)
 
         if isinstance(audio_urls, str):
             if audio_urls.startswith("Status"):
