@@ -259,7 +259,7 @@ def process_music_tasks():
 
         # Se a tarefa retirada não pertence ao telefone, reenfileira e busca outra
         if task_phone != phone:
-            enqueue_task(task_data)  # Coloca de volta no final da fila
+            enqueue_task(lyrics, task_phone)  # Coloca de volta no final da fila
             logger.info(f"[TASK] Task for {task_phone} requeued, searching for correct task.")
             continue  # Continua a busca pela tarefa correta
 
@@ -279,12 +279,14 @@ def process_music_tasks():
 
         if task_id:
             # Salva task_id no Redis (Banco de tarefas)
-            task_db.hset("processed_tasks", phone, task_id)
+            task_id_r = str(task_id)
+            task_db.hset("processed_tasks", phone, task_id_r)
 
             # Salva a música no Redis (Banco de letras/músicas)
-            lyrics_db.rpush(f"lyrics_store:{phone}", task_id)  # Adiciona um novo task_id na lista
-            lyrics_db.hset("lyrics_store", task_id, lyrics)  # Salva as letras associadas ao task_id
-            lyrics_db.hset("lyrics_store", phone, task_id)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
+            lyrics_db.rpush(f"lyrics_store:{phone}", task_id_r)  # Adiciona um novo task_id na lista
+            lyrics_db.hset("lyrics_store", task_id_r, lyrics)  # Salva as letras associadas ao task_id
+            lyrics_db.hset("lyrics_store", phone, task_id_r)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
+
 
             return jsonify({"task_id": task_id}), 200
         else:
