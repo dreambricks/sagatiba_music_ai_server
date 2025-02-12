@@ -5,6 +5,7 @@ import time
 import redis
 import re
 import json
+import asyncio
 
 from datetime import datetime
 
@@ -42,12 +43,16 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
+redis_host = "localhost"
+redis_port = 6379
 # Configuração dos bancos de dados Redis
-task_db = redis.Redis(host='localhost', port=6379, db=0)   # Banco para enfileiramento de tarefas
-lyrics_db = redis.Redis(host='localhost', port=6379, db=1) # Banco para armazenamento das letras de músicas
+task_db = redis.Redis(host=redis_host, port=redis_port, db=0)   # Banco para enfileiramento de tarefas
+lyrics_db = redis.Redis(host=redis_host, port=redis_port, db=1) # Banco para armazenamento das letras de músicas
 # Atualiza o Redis URL apenas para o limiter, apontando para db=2
 limiter_redis_url = "redis://localhost:6379/2"
-error_db = redis.Redis(host='localhost', port=6379, db=3) 
+error_db = redis.Redis(host=redis_host, port=redis_port, db=3)
+processing_db = redis.Redis(host=redis_host, port=redis_port, db=4)  # Armazena tarefas em processamento
+
 
 # Configuração do Rate Limiter no DB 2
 limiter = Limiter(
@@ -263,7 +268,7 @@ def process_music_tasks():
 
         if existing_task_ids and len(existing_task_ids) > 0:
             decoded_task_ids = [task_id.decode("utf-8") for task_id in existing_task_ids]
-            logger.info(f"Existing task IDs for {phone}: {decoded_task_ids}")
+            logger.info(f"Existing task Ids for {phone}: {decoded_task_ids}")
             
             # Se o telefone já tem um task_id em andamento, impede reprocessamento
             if phone in task_db.hkeys("processed_tasks"):
@@ -292,13 +297,13 @@ def get_lyrics_and_audio():
     task_id = request.args.get("task_id")
     host_url = os.getenv("HOST_URL")
     if not task_id:
-        return jsonify({"error": "Task ID is required"}), 400
+        return jsonify({"error": "Task Id is required"}), 400
 
     try:
         # Recupera as letras associadas ao task_id
         lyrics = lyrics_db.hget("lyrics_store", task_id)
         if not lyrics:
-            return jsonify({"error": "Lyrics not found for the given Task ID"}), 404
+            return jsonify({"error": "Lyrics not found for the given Task Id"}), 404
 
         lyrics_decoded = lyrics.decode("utf-8")
 
@@ -319,6 +324,87 @@ def get_lyrics_and_audio():
         logger.error(f"Error retrieving lyrics and audio: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+@socketio.on("get_queue")
+async def send_queue():
+    """Envia a lista atual da fila para o frontend."""
+    queue_items = [json.loads(task.decode("utf-8")) for task in task_db.lrange("task_queue", 0, -1)]
+    await socketio.emit("queue_list", queue_items)
+    logger.info(f"Queue sent to client. Total: {len(queue_items)} items.")
+
+@socketio.on("process_task")
+async def process_task():
+    """Remove temporariamente o primeiro item da fila e envia para o frontend processar."""
+    raw_task = task_db.lpop("task_queue")
+
+    if not raw_task:
+        await socketio.emit("task_result", {"status": "error", "message": "No tasks available."})
+        return
+
+    task = json.loads(raw_task.decode("utf-8"))
+    phone_id = task["phone"]
+    processing_db.set(phone_id, json.dumps(task))  # Marca como em processamento
+
+    logger.info(f"Task assigned: {task}")
+
+    # Enviar tarefa ao frontend para processamento
+    await socketio.emit("task_assigned", task)
+
+    # Aguardar resposta do frontend (timeout de 120 segundos)
+    try:
+        await asyncio.wait_for(wait_for_task_completion(phone_id), timeout=120)
+    except asyncio.TimeoutError:
+        # Se não houver resposta, recoloca a tarefa no topo da fila
+        task_db.lpush("task_queue", json.dumps(task))
+        processing_db.delete(phone_id)  # Remove dos processamentos
+        await socketio.emit("task_result", {"status": "timeout", "message": "Task timeout. Requeued."})
+        logger.warning(f"Task {phone_id} enqueued after timeout.")
+
+@socketio.on("task_completed")
+async def task_completed(data):
+    """Marca a tarefa como concluída e remove do Redis."""
+    phone_id = data.get("phone_id")
+    success = data.get("success")
+
+    if not phone_id:
+        await socketio.emit("task_result", {"status": "error", "message": "Invalid task Id."})
+        return
+
+    if success:
+        processing_db.delete(phone_id)  # Remove do registro de tarefas em andamento
+        await socketio.emit("task_result", {"status": "success", "message": "Task completed successfully."})
+        logger.info(f"Task for {phone_id} completed and dequeued successfully.")
+    else:
+        # Se falhou, recoloca no topo da fila
+        raw_task = processing_db.get(phone_id)
+        if raw_task:
+            task_db.lpush("task_queue", raw_task)
+            processing_db.delete(phone_id)
+            await socketio.emit("task_result", {"status": "failed", "message": "Task failed. Requeued."})
+            logger.warning(f"Task for {phone_id} failed and requeued.")
+
+@socketio.on("requeue_task")
+async def requeue_task(data):
+    """Recoloca a tarefa na fila manualmente a pedido do frontend."""
+    phone_id = data.get("phone_id")
+
+    if not phone_id:
+        await socketio.emit("task_result", {"status": "error", "message": "Invalid task Id for requeue."})
+        return
+
+    raw_task = processing_db.get(phone_id)
+
+    if raw_task:
+        task_db.lpush("task_queue", raw_task)  # Recoloca no topo da fila
+        processing_db.delete(phone_id)  # Remove dos processamentos
+        await socketio.emit("task_result", {"status": "requeued", "message": "Task manually requeued."})
+        logger.info(f"Task for {phone_id} manually requeued.")
+
+
+async def wait_for_task_completion(id):
+    """Espera que a tarefa seja concluída antes de seguir."""
+    while processing_db.exists(id):
+        await asyncio.sleep(1)  # Aguarda 1 segundo entre verificações
+
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
@@ -333,8 +419,8 @@ def request_audio(json):
 
     # Validação dos parâmetros obrigatórios
     if not task_id:
-        logger.warning("[SOCKET] Request without Task ID")
-        emit('error_message', {'error': 'Task ID is required', 'code': 400}, namespace='/')
+        logger.warning("[SOCKET] Request without Task Id")
+        emit('error_message', {'error': 'Task Id is required', 'code': 400}, namespace='/')
         return
 
     if not phone:
