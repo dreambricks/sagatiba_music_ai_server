@@ -5,12 +5,16 @@ import http.client
 import json
 from time import sleep
 from datetime import datetime
+import shutil
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 CLIP_ID_DIR = "storage"
 CLIP_ID_FILE = os.path.join(CLIP_ID_DIR, "clip_id.csv")
+
+def generate_new_task_id():
+    return uuid.uuid4()
 
 # Atualização da função set_clip_id e get_clip_id para usar CSV
 def set_clip_id(clip_id, timestamp):
@@ -210,8 +214,96 @@ def create_music3(lyrics):
         logger.info("Music successfully created, getting task_id")
         return get_task_id(result)
 
+def create_lyrics_filepath(task_id):
+    path = f"static/tasks"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    filename = f"{task_id}.txt"
+
+    return os.path.join(path, filename)
+
+def create_music_json_filepath(task_id):
+    path = f"static/tasks/results"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    filename = f"{task_id}.json"
+    return os.path.join(path, filename)
+
+def create_music4(lyrics):
+    task_id = generate_new_task_id()
+    filepath = create_lyrics_filepath(task_id)
+    with open(filepath, "w") as f:
+        f.write(f"cp mm.json {task_id}.json\n\n")
+        f.write(lyrics)
+        f.write('\n')
+
+    return task_id
+
+
 def create_music(lyrics):
-    return create_music2(lyrics)
+    return create_music4(lyrics)
+
+
+def wait_for_file(filepath: str) -> str:
+    """
+    Continuously checks if a file exists. Once found, reads and returns its contents.
+
+    :param filepath: The path to the file to check.
+    :return: The filepath if the file was found and None if not.
+    """
+    count = 0
+    while not os.path.exists(filepath) and count < 1200:
+        time.sleep(1)  # Wait 1 second before checking again
+        count += 1
+
+    return filepath if os.path.exists(filepath) else None
+
+
+def read_audio_urls(filepath: str) -> list:
+    """
+    Reads a JSON file and extracts values from 'audio1' and 'audio2' fields.
+
+    :param filepath: The path to the JSON file.
+    :return: A list containing the values of 'audio1' and 'audio2'.
+    """
+    with open(filepath, 'r', encoding='utf-8') as file:
+        data = json.load(file)
+
+    return [data.get("audio1"), data.get("audio2")]
+
+
+def get_task_result_json(filepath):
+    try:
+        filepath = wait_for_file(filepath)
+        if filepath is None:
+            return None
+
+        return read_audio_urls(filepath)
+
+    except:
+        return None
+
+
+def collect_music_garbage(task_id):
+    garbage_path = "static/tasks/done"
+
+    lyrics_filepath = create_lyrics_filepath(task_id)
+    links_filepath = create_music_json_filepath(task_id)
+    shutil.move(lyrics_filepath, garbage_path)
+    shutil.move(links_filepath, garbage_path)
+
+
+def get_music2(task_id):
+    filepath = create_music_json_filepath(task_id)
+    result = get_task_result_json(filepath)
+
+    if result is not None:
+        collect_music_garbage(task_id)
+
+    return result
+
 
 def get_music(task_id):
     logger.info(f"Searching for music for task_id: {task_id}")

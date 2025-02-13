@@ -20,6 +20,8 @@ from utils.musicapi_util import create_music, get_music, upload_song, set_clip_i
     get_music2
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
+import utils.db_util as db_util
+import utils.audio_util as audio_util
 
 # Configuração de logging
 logging.basicConfig(
@@ -370,7 +372,7 @@ def request_audio(json):
                 return
 
         if isinstance(audio_urls, list) and audio_urls:
-            file_paths = [store_audio(url, task_id) for url in audio_urls]
+            file_paths = [store_audio_and_fade_out(url, task_id) for url in audio_urls]
             local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
             logger.info(f"[SOCKET] Audio files stored: {file_paths}")
 
@@ -393,7 +395,7 @@ def download_audio():
     if not audio_url:
         return jsonify({"error": "Audio URL not provided"}), 400
 
-    temp_path = store_audio(audio_url)
+    temp_path = store_audio_and_fade_out(audio_url)
     file_name = os.path.basename(temp_path)
     return send_file(temp_path, as_attachment=True, download_name=file_name, mimetype="audio/mpeg")
 
@@ -491,6 +493,19 @@ def store_audio(url, task_id, max_size=1177*1024):
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to download audio file: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+def store_audio_and_fade_out(url, task_id, max_size=1177*1024):
+    filepath = store_audio(url, task_id, max_size)
+
+    if filepath is None:
+        return jsonify({"error": "Erro ao baixar áudio"}), 500
+
+    faded_filepath = db_util.add_suffix_to_filepath(filepath, "f")
+    audio_util.fade_out(filepath, faded_filepath)
+
+    return faded_filepath
+
 
 def save_system_error(context, identifier, error_message):
     """ Salva informações sobre falhas na geração de áudio no Redis """
