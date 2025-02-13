@@ -1,4 +1,5 @@
 import os
+import datetime
 
 NO_ACCENT_PT = {
     '@' : 'a',
@@ -75,3 +76,15 @@ def add_suffix_to_filepath(filepath: str, suffix: str) -> str:
     name, ext = os.path.splitext(filename)
     new_filename = f"{name}{suffix}{ext}"
     return os.path.join(directory, new_filename)
+
+
+def generate_filename_with_datetime(prefix: str, extension: str) -> str:
+    """
+    Generates a filename using the given prefix, the current date and time, and the specified extension.
+
+    :param prefix: The prefix for the filename.
+    :param extension: The file extension.
+    :return: A formatted filename string.
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{prefix}_{timestamp}.{extension.strip('.')}"

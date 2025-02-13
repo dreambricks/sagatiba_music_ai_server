@@ -1,7 +1,8 @@
+import os
 import logging
 import openai
 from dotenv import load_dotenv, find_dotenv
-from utils.db_util import load_file_into_set, remove_accent
+from utils.db_util import load_file_into_set, remove_accent, generate_filename_with_datetime
 import parameters as param
 
 logger = logging.getLogger(__name__)
@@ -101,7 +102,8 @@ def moderation_ok(convidado, recado):
 
     return [True, "OK"]
 
-def generate_lyrics(convidado, opcao, dia_semana, recado):
+
+def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
     logger.info(opcao)
 
     if opcao == "BAR":
@@ -147,5 +149,12 @@ def generate_lyrics(convidado, opcao, dia_semana, recado):
     logger.info(prompt)
     logger.info(response)
     lyrics = response.choices[0].message.content
+
+    if store_location:
+        lyrics_filepath = os.path.join(store_location, generate_filename_with_datetime("lyrics", "txt"))
+        with open(lyrics_filepath, "w", encoding="utf-8") as f:
+            f.write(lyrics)
+            f.write('\n')
+
     return lyrics
 

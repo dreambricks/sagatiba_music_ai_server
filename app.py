@@ -209,7 +209,8 @@ def call_generate_lyrics():
 
     is_ok, error_msg = moderation_ok(destination, message)
     if is_ok:
-        lyrics = generate_lyrics(destination, invite_options, weekdays, message)
+        lyrics_path = "static/lyrics"
+        lyrics = generate_lyrics(destination, invite_options, weekdays, message, lyrics_path)
         logger.info("Lyrics generated successfully.")
         #return redirect(url_for('display_lyrics', lyrics=lyrics, phonw=phonw))
         return jsonify({"lyrics": lyrics})

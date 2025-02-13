@@ -358,7 +358,8 @@ def test_generate_lyrics(destination, invite_options, weekdays, message):
     is_ok, error_msg = moderation_ok(destination, message)
 
     if is_ok:
-        lyrics = generate_lyrics(destination, invite_options, weekdays, message)
+        lyrics_path = "static/lyrics"
+        lyrics = generate_lyrics(destination, invite_options, weekdays, message, lyrics_path)
         logger.info(f"Letras geradas: {lyrics}")
         return lyrics
     else:
@@ -370,7 +371,7 @@ def test_lyrics_generation():
     destination = "José"
     invite_options = "beber em casa"
     weekdays = "Domingo"
-    message = "amarelo"
+    message = "carro amarelo"
 
     lyrics = test_generate_lyrics(destination, invite_options, weekdays, message)
     logger.warning(lyrics)
