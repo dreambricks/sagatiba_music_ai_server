@@ -151,6 +151,8 @@ def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
     lyrics = response.choices[0].message.content
 
     if store_location:
+        if not os.path.exists(store_location):
+            os.makedirs(store_location)
         lyrics_filepath = os.path.join(store_location, generate_filename_with_datetime("lyrics", "txt"))
         with open(lyrics_filepath, "w", encoding="utf-8") as f:
             f.write(lyrics)
