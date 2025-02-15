@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 import requests
 import time
 import redis
@@ -20,6 +21,10 @@ from apscheduler.triggers.cron import CronTrigger # type: ignore
 from utils.musicapi_util import create_music, get_music, upload_song, set_clip_id, get_clip_id, clear_clip_id_file
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
+
+from config.mongo_config import init_mongo
+from routes.user import user_bp
+from routes.audio import audio_bp
 
 # Configuração de logging
 logging.basicConfig(
@@ -42,6 +47,9 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
+
+# Inicializar MongoDB
+init_mongo(app)
 
 redis_host = "localhost"
 redis_port = 6379
@@ -260,7 +268,7 @@ def process_music_tasks():
         # Se a tarefa retirada não pertence ao telefone, reenfileira e busca outra
         if task_phone != phone:
             enqueue_task(lyrics, task_phone)  # Coloca de volta no final da fila
-            logger.info(f"[TASK] Task for {task_phone} requeued, searching for correct task.")
+            logger.info(f"[TASK] Task {task_phone} requeued, searching for correct task.")
             continue  # Continua a busca pela tarefa correta
 
         # Verifica se a música já foi processada para este telefone e adiciona novo task_id
@@ -343,8 +351,8 @@ async def process_task():
         return
 
     task = json.loads(raw_task.decode("utf-8"))
-    phone_id = task["phone"]
-    processing_db.set(phone_id, json.dumps(task))  # Marca como em processamento
+    id = task["id"]
+    processing_db.set(id, json.dumps(task))  # Marca como em processamento
 
     logger.info(f"Task assigned: {task}")
 
@@ -353,53 +361,53 @@ async def process_task():
 
     # Aguardar resposta do frontend (timeout de 120 segundos)
     try:
-        await asyncio.wait_for(wait_for_task_completion(phone_id), timeout=120)
+        await asyncio.wait_for(wait_for_task_completion(id), timeout=120)
     except asyncio.TimeoutError:
         # Se não houver resposta, recoloca a tarefa no topo da fila
         task_db.lpush("task_queue", json.dumps(task))
-        processing_db.delete(phone_id)  # Remove dos processamentos
+        processing_db.delete(id)  # Remove dos processamentos
         await socketio.emit("task_result", {"status": "timeout", "message": "Task timeout. Requeued."})
-        logger.warning(f"Task {phone_id} enqueued after timeout.")
+        logger.warning(f"Task {id} enqueued after timeout.")
 
 @socketio.on("task_completed")
 async def task_completed(data):
     """Marca a tarefa como concluída e remove do Redis."""
-    phone_id = data.get("phone_id")
+    id = data.get("id")
     success = data.get("success")
 
-    if not phone_id:
+    if not id:
         await socketio.emit("task_result", {"status": "error", "message": "Invalid task Id."})
         return
 
     if success:
-        processing_db.delete(phone_id)  # Remove do registro de tarefas em andamento
+        processing_db.delete(id)  # Remove do registro de tarefas em andamento
         await socketio.emit("task_result", {"status": "success", "message": "Task completed successfully."})
-        logger.info(f"Task for {phone_id} completed and dequeued successfully.")
+        logger.info(f"Task {id} completed and dequeued successfully.")
     else:
         # Se falhou, recoloca no topo da fila
-        raw_task = processing_db.get(phone_id)
+        raw_task = processing_db.get(id)
         if raw_task:
             task_db.lpush("task_queue", raw_task)
-            processing_db.delete(phone_id)
+            processing_db.delete(id)
             await socketio.emit("task_result", {"status": "failed", "message": "Task failed. Requeued."})
-            logger.warning(f"Task for {phone_id} failed and requeued.")
+            logger.warning(f"Task {id} failed and requeued.")
 
 @socketio.on("requeue_task")
 async def requeue_task(data):
     """Recoloca a tarefa na fila manualmente a pedido do frontend."""
-    phone_id = data.get("phone_id")
+    id = data.get("id")
 
-    if not phone_id:
+    if not id:
         await socketio.emit("task_result", {"status": "error", "message": "Invalid task Id for requeue."})
         return
 
-    raw_task = processing_db.get(phone_id)
+    raw_task = processing_db.get(id)
 
     if raw_task:
         task_db.lpush("task_queue", raw_task)  # Recoloca no topo da fila
-        processing_db.delete(phone_id)  # Remove dos processamentos
+        processing_db.delete(id)  # Remove dos processamentos
         await socketio.emit("task_result", {"status": "requeued", "message": "Task manually requeued."})
-        logger.info(f"Task for {phone_id} manually requeued.")
+        logger.info(f"Task {id} manually requeued.")
 
 
 async def wait_for_task_completion(id):
@@ -522,6 +530,10 @@ def download_audio():
 #         logger.error(f"Request failed: {e}")
 #         return jsonify({"error": str(e)}), 500
 
+# Registrar rotas do Mongo
+app.register_blueprint(user_bp, url_prefix="/api")
+app.register_blueprint(audio_bp, url_prefix="/api")
+
 def get_task_id_from_url(url):
     """
     Extracts the task_id from a given URL.
@@ -595,6 +607,18 @@ def enqueue_task(lyrics, phone):
     logger.info(f"Enqueuing task: {task_data}")
     task_db.rpush('lyrics_queue', task_data)
 
+def enqueue_task(lyrics, phone):
+    """ Adiciona uma tarefa à fila FIFO no Redis, armazenando um ID, a letra e o telefone do usuário """
+    id = str(uuid.uuid4())  # Gera um UUID único para cada tarefa
+    task_data = json.dumps({
+        "id": id,
+        "lyrics": lyrics,
+        "phone": phone
+    })
+
+    logger.info(f"Enqueuing task: {task_data}")
+    task_db.rpush('lyrics_queue', task_data)
+    
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
     return task_db.lpop('lyrics_queue')
