@@ -425,7 +425,7 @@ def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
     logger.info(f"[SOCKET] Request received: {json}")
 
-    id = json.get('id')
+    id = json.get('task_id')
     phone = json.get('phone')
     host_url = os.getenv("HOST_URL")
 
