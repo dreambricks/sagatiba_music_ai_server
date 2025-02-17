@@ -1,3 +1,6 @@
+import os
+import datetime
+
 NO_ACCENT_PT = {
     '@' : 'a',
     '$' : 's',
@@ -59,3 +62,29 @@ def load_file_into_set(file_path):
     except FileNotFoundError:
         print(f"Error: File not found at '{file_path}'")
         return set()
+
+
+def add_suffix_to_filepath(filepath: str, suffix: str) -> str:
+    """
+    Adds a suffix at the end of a file path, before the extension.
+
+    :param filepath: The original file path.
+    :param suffix: String that will be added to the file name
+    :return: The modified file path with the suffix added before the extension.
+    """
+    directory, filename = os.path.split(filepath)
+    name, ext = os.path.splitext(filename)
+    new_filename = f"{name}{suffix}{ext}"
+    return os.path.join(directory, new_filename)
+
+
+def generate_filename_with_datetime(prefix: str, extension: str) -> str:
+    """
+    Generates a filename using the given prefix, the current date and time, and the specified extension.
+
+    :param prefix: The prefix for the filename.
+    :param extension: The file extension.
+    :return: A formatted filename string.
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{prefix}_{timestamp}.{extension.strip('.')}"
