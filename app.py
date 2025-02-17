@@ -22,6 +22,7 @@ from utils.musicapi_util import create_music, get_music, upload_song, set_clip_i
     get_music2
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
+from config.mongo_config import mongo
 import utils.db_util as db_util
 import utils.audio_util as audio_util
 
@@ -158,7 +159,7 @@ def check_system_status():
     for key, value in errors.items():
         error_data = json.loads(value.decode("utf-8"))
         error_list.append({
-            "error_id": key.decode("utf-8"),  # 🔹 Inclui a chave como identificador do erro
+            "error_id": key.decode("utf-8"),  # Inclui a chave como identificador do erro
             "context": error_data["context"],
             "identifier": error_data["identifier"],
             "error_message": error_data["error_message"],
@@ -306,36 +307,36 @@ def generate_task_id():
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
-    """Retorna as letras da música e os arquivos de áudio associados ao task_id."""
-    task_id = request.args.get("task_id")
+    """Retorna as letras da música e os arquivos de áudio associados ao id."""
+    id = request.args.get("task_id")
     host_url = os.getenv("HOST_URL")
-    if not task_id:
-        return jsonify({"error": "Task Id is required"}), 400
+
+    if not id:
+        return jsonify({"error": "Id is required"}), 400
 
     try:
-        # Recupera as letras associadas ao task_id
-        lyrics = lyrics_db.hget("lyrics_store", task_id)
-        if not lyrics:
-            return jsonify({"error": "Lyrics not found for the given Task Id"}), 404
+        # Busca a música no MongoDB usando o campo `redis_id`
+        audio_entry = mongo.db.GeneratedAudios.find_one({"redis_id": id})
 
-        lyrics_decoded = lyrics.decode("utf-8")
+        if not audio_entry:
+            return jsonify({"error": "Lyrics and audio not found for the given Id"}), 404
 
-        # Diretório onde os áudios estão armazenados
-        audio_dir = "static/mp3/"
+        # Obtém letras e caminhos dos áudios
+        lyrics = audio_entry.get("lyrics", "No lyrics found")
         audio_files = [
-            f"{host_url}{audio_dir}{file}"
-            for file in os.listdir(audio_dir)
-            if file.startswith(f"sagatiba_{task_id}_")
+            f"{host_url}/{file}" for file in audio_entry.get("audio_urls", [])
         ]
 
         return jsonify({
             "audio_urls": audio_files,
-            "lyrics": lyrics_decoded
+            "lyrics": lyrics
         }), 200
 
     except Exception as e:
         logger.error(f"Error retrieving lyrics and audio: {e}")
+        save_system_error("GET_LYRICS_AUDIO", f"id_{id}", "No audio and no lyrics found for the given id.")
         return jsonify({"error": "Internal server error"}), 500
+
 
 @socketio.on("get_queue")
 async def send_queue():
@@ -422,17 +423,14 @@ async def requeue_task(data):
 @socketio.on('request_audio_url')
 def request_audio(json):
     """Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto."""
-
-    MAX_TRIES = 50
-    RETRY_INTERVAL = 10  # Segundos entre tentativas
     logger.info(f"[SOCKET] Request received: {json}")
 
-    task_id = json.get('task_id')
+    id = json.get('id')
     phone = json.get('phone')
     host_url = os.getenv("HOST_URL")
 
     # Validação dos parâmetros obrigatórios
-    if not task_id:
+    if not id:
         logger.warning("[SOCKET] Request without Task Id")
         emit('error_message', {'error': 'Task Id is required', 'code': 400}, namespace='/')
         return
@@ -442,47 +440,27 @@ def request_audio(json):
         emit('error_message', {'error': 'Phone number is required', 'code': 400}, namespace='/')
         return
 
-    for attempt in range(1, MAX_TRIES + 1):
-        logger.info(f"[SOCKET] Attempt {attempt}/{MAX_TRIES}: searching for audio for task_id={task_id}")
-        emit('message', {'message': f"Attempt {attempt}", 'code': 204}, namespace='/')
+    # Busca no banco de dados `GeneratedAudios` pelo `redis_id`
+    audio_entry = mongo.db.GeneratedAudios.find_one({"redis_id": id})
 
-        audio_urls = get_music2(task_id)
+    if not audio_entry:
+        logger.warning(f"[SOCKET] No audio found for id={id}")
+        save_system_error("REQUEST_AUDIO", f"id_{id}", "No audio found for the given id.")
+        emit('error_message', {'error': 'No audio found for the given id', 'code': 404}, namespace='/')
+        return
 
-        if isinstance(audio_urls, str):
-            if audio_urls.startswith("Status"):
-                logger.info(f"[SOCKET] Status received for task_id={task_id}: {audio_urls}")
-                emit('message', {'status': audio_urls}, namespace='/')
-            else:
-                logger.error(f"[SOCKET] Error retrieving audio for task_id={task_id}: {audio_urls}")
+    # Obtém os caminhos dos arquivos de áudio armazenados
+    file_paths = audio_entry.get("audio_urls", [])
+    local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
 
-                # Salva erro para futura consulta via endpoint de status
-                save_system_error("API_NO_RESPONSE", f"task_id_{task_id}", "Music API isn't responding")
+    logger.info(f"[SOCKET] Audio files stored: {file_paths}")
 
+    # Envia mensagem via WhatsApp
+    message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={id}"
+    send_whatsapp_download_message(message_url, phone)
 
-                # Tenta reprocessar o upload apenas se ainda houver tentativas restantes
-                if attempt < MAX_TRIES:
-                    logger.info(f"[SOCKET] Triggering worker_upload_song() for task_id={task_id} after error.")
-                    worker_upload_song()
-
-                emit('error_message', {'error': audio_urls, 'code': 500}, namespace='/')
-                return
-
-        if isinstance(audio_urls, list) and audio_urls:
-            file_paths = [store_audio_and_fade_out(url, task_id) for url in audio_urls]
-            local_audio_urls = [f"{host_url}/{file}" for file in file_paths]
-            logger.info(f"[SOCKET] Audio files stored: {file_paths}")
-
-            message_url = f"https://seguenasaga.sagatiba.com/mensagem?id={task_id}"
-            send_whatsapp_download_message(message_url, phone)
-            emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
-            return
-
-        socketio.sleep(RETRY_INTERVAL)
-
-    # Se as tentativas acabarem sem sucesso, salva a falha para consulta futura
-    logger.error(f"[SOCKET] Failed to generate audio for task_id={task_id} after {MAX_TRIES} attempts")
-    save_system_error("REQUEST_AUDIO", f"task_id_{task_id}", "Exceeded max retries without success.")
-    emit('error_message', {'error': 'Failed to generate audio after several attempts', 'code': 500}, namespace='/')
+    # Responde ao WebSocket com os áudios encontrados
+    emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
 
 @app.route("/audio/download", methods=["GET"])
 def download_audio():
