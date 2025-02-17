@@ -75,32 +75,32 @@ limiter = Limiter(
 
 scheduler = APScheduler()
 
-def worker_upload_song():
-    """
-    Tarefa agendada que faz upload de música e armazena o clip_id com data e hora em um CSV.
-    """
-    now = datetime.now()
-    logger.info(f"[WORKER] Executing upload at {now.strftime('%Y-%m-%d %H:%M:%S')}")
+# def worker_upload_song():
+#     """
+#     Tarefa agendada que faz upload de música e armazena o clip_id com data e hora em um CSV.
+#     """
+#     now = datetime.now()
+#     logger.info(f"[WORKER] Executing upload at {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    host_url = os.getenv("HOST_URL")  # Usa a variável de ambiente
-    response = upload_song(host_url)
+#     host_url = os.getenv("HOST_URL")  # Usa a variável de ambiente
+#     response = upload_song(host_url)
 
-    if response:
-        try:
-            data = json.loads(response)
-            if data.get("code") == 200 and "clip_id" in data:
-                clip_id = data["clip_id"]
-                timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
-                set_clip_id(clip_id, timestamp)
-                logger.info(f"[WORKER] Successful Upload! Saved clip Id: {clip_id}")
-                return {"clip_id": clip_id, "timestamp": timestamp}  # Retorna os dados corretamente
-            else:
-                logger.warning(f"[WORKER] Failed to upload: {data}")
-                # Salva erro para futura consulta via endpoint de status
-                save_system_error("UPLOAD_SONG_FAILED", f"clip_id_{now.strftime('%Y-%m-%d %H:%M:%S')}", f"Failed to upload: {data}")
-        except json.JSONDecodeError:
-            logger.error(f"[WORKER] Error decoding JSON: {response}")
-    return None  # Retorna None se falhar
+#     if response:
+#         try:
+#             data = json.loads(response)
+#             if data.get("code") == 200 and "clip_id" in data:
+#                 clip_id = data["clip_id"]
+#                 timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
+#                 set_clip_id(clip_id, timestamp)
+#                 logger.info(f"[WORKER] Successful Upload! Saved clip Id: {clip_id}")
+#                 return {"clip_id": clip_id, "timestamp": timestamp}  # Retorna os dados corretamente
+#             else:
+#                 logger.warning(f"[WORKER] Failed to upload: {data}")
+#                 # Salva erro para futura consulta via endpoint de status
+#                 save_system_error("UPLOAD_SONG_FAILED", f"clip_id_{now.strftime('%Y-%m-%d %H:%M:%S')}", f"Failed to upload: {data}")
+#         except json.JSONDecodeError:
+#             logger.error(f"[WORKER] Error decoding JSON: {response}")
+#     return None  # Retorna None se falhar
 
 # Função para limpar as tarefas do Redis
 def clear_task_db():
@@ -108,19 +108,19 @@ def clear_task_db():
     logger.info("[SCHEDULER] Redis task database cleaned at 04:00 AM")
 
 # Adicionando agendamentos
-scheduler.add_job(
-    id='worker_upload_song_morning',
-    func=worker_upload_song,
-    trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
-    next_run_time=datetime.now(),
-    replace_existing=True
-)
-scheduler.add_job(
-    id='worker_upload_song_afternoon',
-    func=worker_upload_song,
-    trigger=CronTrigger(hour=16, minute=0),  # Roda todo dia às 04:00 PM
-    replace_existing=True
-)
+# scheduler.add_job(
+#     id='worker_upload_song_morning',
+#     func=worker_upload_song,
+#     trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
+#     next_run_time=datetime.now(),
+#     replace_existing=True
+# )
+# scheduler.add_job(
+#     id='worker_upload_song_afternoon',
+#     func=worker_upload_song,
+#     trigger=CronTrigger(hour=16, minute=0),  # Roda todo dia às 04:00 PM
+#     replace_existing=True
+# )
 scheduler.add_job(
     id='clear_task_db',
     func=clear_task_db,
@@ -173,38 +173,38 @@ def check_system_status():
     }), 500
 
 
-@app.route("/check/clip_id", methods=["GET", "POST"])
-def check_clip_id():
-    """
-    GET: Retorna o valor atual do clip_id armazenado com data e hora.
-    Se não houver clip_id, aciona um worker_upload_song automaticamente.
+# @app.route("/check/clip_id", methods=["GET", "POST"])
+# def check_clip_id():
+#     """
+#     GET: Retorna o valor atual do clip_id armazenado com data e hora.
+#     Se não houver clip_id, aciona um worker_upload_song automaticamente.
     
-    POST: Executa worker_upload_song caso não haja clip_id salvo.
-    """
-    if request.method == "GET":
-        clip_data = get_clip_id()
-        if not clip_data:
-            logger.info("[CHECK] No clip_id found. Initiating automatic upload.")
-            clip_data = worker_upload_song()
-            if clip_data:  # Verifica se a função retornou um clip_id válido
-                return jsonify(clip_data), 200
-            return jsonify({"error": "Failed to generate clip_id"}), 500  # Evita erro 500 sem resposta útil
+#     POST: Executa worker_upload_song caso não haja clip_id salvo.
+#     """
+#     if request.method == "GET":
+#         clip_data = get_clip_id()
+#         if not clip_data:
+#             logger.info("[CHECK] No clip_id found. Initiating automatic upload.")
+#             clip_data = worker_upload_song()
+#             if clip_data:  # Verifica se a função retornou um clip_id válido
+#                 return jsonify(clip_data), 200
+#             return jsonify({"error": "Failed to generate clip_id"}), 500  # Evita erro 500 sem resposta útil
         
-        return jsonify({
-            "clip_id": clip_data["clip_id"],
-            "timestamp": clip_data["timestamp"]
-        }), 200
+#         return jsonify({
+#             "clip_id": clip_data["clip_id"],
+#             "timestamp": clip_data["timestamp"]
+#         }), 200
 
-    elif request.method == "POST":
-        logger.info("[CHECK] Nenhum clip_id encontrado. Executando upload via POST.")
-        clip_data = worker_upload_song()
-        if clip_data:
-            return jsonify({
-                "message": "Upload added.",
-                "clip_id": clip_data["clip_id"],
-                "timestamp": clip_data["timestamp"]
-            }), 200
-        return jsonify({"[CHECK] No clip_id found. Initiating upload via POST."}), 500
+#     elif request.method == "POST":
+#         logger.info("[CHECK] Nenhum clip_id encontrado. Executando upload via POST.")
+#         clip_data = worker_upload_song()
+#         if clip_data:
+#             return jsonify({
+#                 "message": "Upload added.",
+#                 "clip_id": clip_data["clip_id"],
+#                 "timestamp": clip_data["timestamp"]
+#             }), 200
+#         return jsonify({"[CHECK] No clip_id found. Initiating upload via POST."}), 500
 
 @app.route("/lyrics", methods=["POST"])
 #@limiter.limit("1 per 5 minutes")
@@ -248,61 +248,61 @@ def generate_task_id():
     logger.info(f"Task enqueued for phone: {phone}")
     return jsonify({"status": "Your task has been enqueued"}), 202
 
-@app.route("/lyrics/process", methods=["POST"])
-def process_music_tasks():
-    """Processa a próxima tarefa da fila e retorna o task_id se o telefone for o mesmo"""
-    phone = request.json.get("phone")  # O telefone vem no corpo da requisição
-    if not phone:
-        return jsonify({"error": "Phone number is required"}), 400
+# @app.route("/lyrics/process", methods=["POST"])
+# def process_music_tasks():
+#     """Processa a próxima tarefa da fila e retorna o task_id se o telefone for o mesmo"""
+#     phone = request.json.get("phone")  # O telefone vem no corpo da requisição
+#     if not phone:
+#         return jsonify({"error": "Phone number is required"}), 400
 
-    while True:
-        raw_task = dequeue_task()  # Retira a primeira tarefa FIFO
-        if not raw_task:
-            save_system_error("TASK_DEQUEUE_FAILED", f"phone_{phone}", f"No task enqueued for phone {phone} to be dequeued")
-            return jsonify({"error": "No tasks in the queue"}), 404
+#     while True:
+#         raw_task = dequeue_task()  # Retira a primeira tarefa FIFO
+#         if not raw_task:
+#             save_system_error("TASK_DEQUEUE_FAILED", f"phone_{phone}", f"No task enqueued for phone {phone} to be dequeued")
+#             return jsonify({"error": "No tasks in the queue"}), 404
 
-        try:
-            task_data = json.loads(raw_task.decode("utf-8"))  
-        except json.JSONDecodeError:
-            return jsonify({"error": "Invalid task data format"}), 500
+#         try:
+#             task_data = json.loads(raw_task.decode("utf-8"))  
+#         except json.JSONDecodeError:
+#             return jsonify({"error": "Invalid task data format"}), 500
 
-        lyrics = task_data["lyrics"]
-        task_phone = task_data["phone"]
+#         lyrics = task_data["lyrics"]
+#         task_phone = task_data["phone"]
 
-        # Se a tarefa retirada não pertence ao telefone, reenfileira e busca outra
-        if task_phone != phone:
-            enqueue_task(lyrics, phone)  # Coloca de volta no final da fila
-            logger.info(f"[TASK] Task for {task_phone} requeued, searching for correct task.")
-            continue  # Continua a busca pela tarefa correta
+#         # Se a tarefa retirada não pertence ao telefone, reenfileira e busca outra
+#         if task_phone != phone:
+#             enqueue_task(lyrics, phone)  # Coloca de volta no final da fila
+#             logger.info(f"[TASK] Task for {task_phone} requeued, searching for correct task.")
+#             continue  # Continua a busca pela tarefa correta
 
-        # Verifica se a música já foi processada para este telefone e adiciona novo task_id
-        existing_task_ids = lyrics_db.lrange(f"lyrics_store:{phone}", 0, -1)
+#         # Verifica se a música já foi processada para este telefone e adiciona novo task_id
+#         existing_task_ids = lyrics_db.lrange(f"lyrics_store:{phone}", 0, -1)
 
-        if existing_task_ids and len(existing_task_ids) > 0:
-            decoded_task_ids = [task_id.decode("utf-8") for task_id in existing_task_ids]
-            logger.info(f"Existing task Ids for {phone}: {decoded_task_ids}")
+#         if existing_task_ids and len(existing_task_ids) > 0:
+#             decoded_task_ids = [task_id.decode("utf-8") for task_id in existing_task_ids]
+#             logger.info(f"Existing task Ids for {phone}: {decoded_task_ids}")
             
-            # Se o telefone já tem um task_id em andamento, impede reprocessamento
-            if phone in task_db.hkeys("processed_tasks"):
-                return jsonify({"error": "A task is already in progress for this phone"}), 409
+#             # Se o telefone já tem um task_id em andamento, impede reprocessamento
+#             if phone in task_db.hkeys("processed_tasks"):
+#                 return jsonify({"error": "A task is already in progress for this phone"}), 409
 
-        # Cria a música e retorna um task_id
-        task_id = create_music(lyrics)
+#         # Cria a música e retorna um task_id
+#         task_id = create_music(lyrics)
 
-        if task_id:
-            # Salva task_id no Redis (Banco de tarefas)
-            task_id_r = str(task_id)
-            task_db.hset("processed_tasks", phone, task_id_r)
+#         if task_id:
+#             # Salva task_id no Redis (Banco de tarefas)
+#             task_id_r = str(task_id)
+#             task_db.hset("processed_tasks", phone, task_id_r)
 
-            # Salva a música no Redis (Banco de letras/músicas)
-            lyrics_db.rpush(f"lyrics_store:{phone}", task_id_r)  # Adiciona um novo task_id na lista
-            lyrics_db.hset("lyrics_store", task_id_r, lyrics)  # Salva as letras associadas ao task_id
-            lyrics_db.hset("lyrics_store", phone, task_id_r)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
+#             # Salva a música no Redis (Banco de letras/músicas)
+#             lyrics_db.rpush(f"lyrics_store:{phone}", task_id_r)  # Adiciona um novo task_id na lista
+#             lyrics_db.hset("lyrics_store", task_id_r, lyrics)  # Salva as letras associadas ao task_id
+#             lyrics_db.hset("lyrics_store", phone, task_id_r)  # Uso futuro: Se quisermos recuperar a última música gerada para um usuário ou telefone
 
-            return jsonify({"task_id": task_id}), 200
-        else:
-            save_system_error("NO_TASK_ID", f"phone_{phone}", f"No task_id returned for phone {phone} and lyrics {lyrics}")
-            return jsonify({"error": "Failed to create music task"}), 500
+#             return jsonify({"task_id": task_id}), 200
+#         else:
+#             save_system_error("NO_TASK_ID", f"phone_{phone}", f"No task_id returned for phone {phone} and lyrics {lyrics}")
+#             return jsonify({"error": "Failed to create music task"}), 500
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
@@ -362,15 +362,15 @@ async def process_task():
     # Enviar tarefa ao frontend para processamento
     await socketio.emit("task_assigned", task)
 
-    # Aguardar resposta do frontend (timeout de 120 segundos)
-    try:
-        await asyncio.wait_for(wait_for_task_completion(id), timeout=120)
-    except asyncio.TimeoutError:
-        # Se não houver resposta, recoloca a tarefa no topo da fila
-        task_db.lpush("task_queue", json.dumps(task))
-        processing_db.delete(id)  # Remove dos processamentos
-        await socketio.emit("task_result", {"status": "timeout", "message": "Task timeout. Requeued."})
-        logger.warning(f"Task {id} enqueued after timeout.")
+    # # Aguardar resposta do frontend (timeout de 120 segundos)
+    # try:
+    #     await asyncio.wait_for(wait_for_task_completion(id), timeout=120)
+    # except asyncio.TimeoutError:
+    #     # Se não houver resposta, recoloca a tarefa no topo da fila
+    #     task_db.lpush("task_queue", json.dumps(task))
+    #     processing_db.delete(id)  # Remove dos processamentos
+    #     await socketio.emit("task_result", {"status": "timeout", "message": "Task timeout. Requeued."})
+    #     logger.warning(f"Task {id} enqueued after timeout.")
 
 @socketio.on("task_completed")
 async def task_completed(data):
@@ -392,8 +392,9 @@ async def task_completed(data):
         if raw_task:
             task_db.lpush("task_queue", raw_task)
             processing_db.delete(id)
-            await socketio.emit("task_result", {"status": "failed", "message": "Task failed. Requeued."})
+            await socketio.emit("task_result", {"status": "failed", "message": "Task completion failed. Requeued."})
             logger.warning(f"Task {id} failed and requeued.")
+            save_system_error("TASK_DEQUEUE_FAILED", f"task_id_{id}", f"Task {id} completion failed. Requeued.")
 
 @socketio.on("requeue_task")
 async def requeue_task(data):
@@ -413,10 +414,10 @@ async def requeue_task(data):
         logger.info(f"Task {id} manually requeued.")
 
 
-async def wait_for_task_completion(id):
-    """Espera que a tarefa seja concluída antes de seguir."""
-    while processing_db.exists(id):
-        await asyncio.sleep(1)  # Aguarda 1 segundo entre verificações
+# async def wait_for_task_completion(id):
+#     """Espera que a tarefa seja concluída antes de seguir."""
+#     while processing_db.exists(id):
+#         await asyncio.sleep(1)  # Aguarda 1 segundo entre verificações
 
 @socketio.on('request_audio_url')
 def request_audio(json):
@@ -604,7 +605,6 @@ def store_audio_and_fade_out(url, task_id, max_size=1177*1024):
     audio_util.fade_out(filepath, faded_filepath)
 
     return faded_filepath
-
 
 def save_system_error(context, identifier, error_message):
     """ Salva informações sobre falhas na geração de áudio no Redis """
