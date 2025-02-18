@@ -167,9 +167,9 @@ def generate_task_id():
         return jsonify({"error": "Lyrics parameter is missing"}), 400
 
     # Enfileira as letras para processamento posterior
-    enqueue_task(lyrics, phone)
-    logger.info(f"Task enqueued for phone: {phone}")
-    return jsonify({"status": "Your task has been enqueued"}), 202
+    id = enqueue_task(lyrics, phone)
+    logger.info(f"Task {id} enqueued for phone: {phone}")
+    return jsonify({"status": "Your task has been enqueued", "task_id": id}), 202
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
@@ -337,6 +337,7 @@ def enqueue_task(lyrics, phone):
 
     logger.info(f"Enqueuing task: {task_data}")
     task_db.rpush('lyrics_queue', task_data)
+    return id
     
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
