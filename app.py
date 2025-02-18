@@ -9,8 +9,6 @@ from flask_cors import CORS
 from flask_socketio import emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_apscheduler import APScheduler # type: ignore
-from apscheduler.triggers.cron import CronTrigger # type: ignore
 
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
@@ -66,23 +64,6 @@ limiter = Limiter(
     storage_uri=limiter_redis_url,
     storage_options={"socket_connect_timeout": 30}
 )
-
-scheduler = APScheduler()
-
-# Função para limpar as tarefas do Redis
-def clear_task_db():
-    task_db.flushdb()
-    logger.info("[SCHEDULER] Redis task database cleaned at 04:00 AM")
-
-scheduler.add_job(
-    id='clear_task_db',
-    func=clear_task_db,
-    trigger=CronTrigger(hour=4, minute=0),  # Roda todo dia às 04:00 AM
-    replace_existing=True
-)
-
-# Executa o scheduler
-scheduler.start()
 
 @app.route('/check', methods=['GET'])
 def health_check():
