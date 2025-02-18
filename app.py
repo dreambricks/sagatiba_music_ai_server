@@ -1,18 +1,12 @@
 import logging
 import os
 import uuid
-import requests
-import time
 import redis
-import re
 import json
-import asyncio
 
-from datetime import datetime
-
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+from flask_socketio import emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_apscheduler import APScheduler # type: ignore
@@ -20,13 +14,14 @@ from apscheduler.triggers.cron import CronTrigger # type: ignore
 
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
-from config.mongo_config import mongo
-import utils.db_util as db_util
-import utils.audio_util as audio_util
+from utils.error_util import save_system_error
 
-from config.mongo_config import init_mongo
+from config.mongo_config import mongo, init_mongo
+from config.socket_config import socketio
+
 from routes.user import user_bp
 from routes.audio import audio_bp
+from routes.tasks import task_bp
 
 # Configuração de logging
 logging.basicConfig(
@@ -47,11 +42,11 @@ for handler in logger.handlers:
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
-socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
-# Inicializar MongoDB
+# Inicializar MongoDB e SocketIO
 init_mongo(app)
+socketio.init_app(app)
 
 redis_host = "localhost"
 redis_port = 6379
@@ -169,6 +164,13 @@ def generate_task_id():
     # Enfileira as letras para processamento posterior
     id = enqueue_task(lyrics, phone)
     logger.info(f"Task {id} enqueued for phone: {phone}")
+
+    # Chama o socket para atualizar a fila no frontend
+    queue_items = task_db.lrange("lyrics_queue", 0, -1)
+    queue_items = [json.loads(task.decode("utf-8")) for task in queue_items]
+    socketio.emit("queue_list", queue_items, namespace="/")
+    logger.info(f"Queue updated after enqueue. Total: {len(queue_items)} items.")
+
     return jsonify({"status": "Your task has been enqueued", "task_id": id}), 202
 
 @app.route("/lyrics/get", methods=["GET"])
@@ -204,70 +206,11 @@ def get_lyrics_and_audio():
         return jsonify({"error": "Internal server error"}), 500
 
 @socketio.on("get_queue")
-async def send_queue():
+def send_queue():
     """Envia a lista atual da fila para o frontend."""
-    queue_items = [json.loads(task.decode("utf-8")) for task in task_db.lrange("task_queue", 0, -1)]
-    await socketio.emit("queue_list", queue_items)
+    queue_items = [json.loads(task.decode("utf-8")) for task in task_db.lrange("lyrics_queue", 0, -1)]
+    socketio.emit("queue_list", queue_items)
     logger.info(f"Queue sent to client. Total: {len(queue_items)} items.")
-
-@socketio.on("process_task")
-async def process_task():
-    """Remove temporariamente o primeiro item da fila e envia para o frontend processar."""
-    raw_task = task_db.lpop("task_queue")
-
-    if not raw_task:
-        await socketio.emit("task_result", {"status": "error", "message": "No tasks available."})
-        return
-
-    task = json.loads(raw_task.decode("utf-8"))
-    id = task["id"]
-    processing_db.set(id, json.dumps(task))  # Marca como em processamento
-
-    logger.info(f"Task assigned: {task}")
-
-    # Enviar tarefa ao frontend para processamento
-    await socketio.emit("task_assigned", task)
-
-@socketio.on("task_completed")
-async def task_completed(data):
-    """Marca a tarefa como concluída e remove do Redis."""
-    id = data.get("id")
-    success = data.get("success")
-
-    if not id:
-        await socketio.emit("task_result", {"status": "error", "message": "Invalid task Id."})
-        return
-
-    if success:
-        processing_db.delete(id)  # Remove do registro de tarefas em andamento
-        await socketio.emit("task_result", {"status": "success", "message": "Task completed successfully."})
-        logger.info(f"Task {id} completed and dequeued successfully.")
-    else:
-        # Se falhou, recoloca no topo da fila
-        raw_task = processing_db.get(id)
-        if raw_task:
-            task_db.lpush("task_queue", raw_task)
-            processing_db.delete(id)
-            await socketio.emit("task_result", {"status": "failed", "message": "Task completion failed. Requeued."})
-            logger.warning(f"Task {id} failed and requeued.")
-            save_system_error("TASK_DEQUEUE_FAILED", f"task_id_{id}", f"Task {id} completion failed. Requeued.")
-
-@socketio.on("requeue_task")
-async def requeue_task(data):
-    """Recoloca a tarefa na fila manualmente a pedido do frontend."""
-    id = data.get("id")
-
-    if not id:
-        await socketio.emit("task_result", {"status": "error", "message": "Invalid task Id for requeue."})
-        return
-
-    raw_task = processing_db.get(id)
-
-    if raw_task:
-        task_db.lpush("task_queue", raw_task)  # Recoloca no topo da fila
-        processing_db.delete(id)  # Remove dos processamentos
-        await socketio.emit("task_result", {"status": "requeued", "message": "Task manually requeued."})
-        logger.info(f"Task {id} manually requeued.")
 
 @socketio.on('request_audio_url')
 def request_audio(json):
@@ -314,17 +257,7 @@ def request_audio(json):
 # Registrar rotas do Mongo
 app.register_blueprint(user_bp, url_prefix="/api")
 app.register_blueprint(audio_bp, url_prefix="/api")
-
-def save_system_error(context, identifier, error_message):
-    """ Salva informações sobre falhas na geração de áudio no Redis """
-    error_data = {
-        "context": context,
-        "identifier": identifier,
-        "error_message": error_message,
-        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
-    error_db.hset("system_errors", identifier, json.dumps(error_data))
-    logger.error(f"[ERROR] Error saved in context {context} for identifier={identifier}: {error_message}")
+app.register_blueprint(task_bp, url_prefix="/api")
 
 def enqueue_task(lyrics, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando um ID, a letra e o telefone do usuário """

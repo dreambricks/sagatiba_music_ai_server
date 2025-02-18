@@ -19,34 +19,11 @@ def generate_lyrics():
     response = requests.post(f"{BASE_URL}/lyrics/generate", json=payload)
     print("📥 Lyrics Requested:", response.json())
 
-def process_task():
-    """Simula trabalhadores retirando tarefas da fila"""
-    response = requests.post(f"{BASE_URL}/lyrics/process", json={"phone": random.choice(PHONE_NUMBERS)})
-    data = response.json()
-    
-    if "task_id" in data:
-        task_id = data["task_id"]
-        print(f"👷 Worker Processing Task {task_id}")
-
-        # Simula tempo de trabalho
-        time.sleep(random.randint(2, 5))
-
-        # 20% de chance de o trabalhador **não concluir** a tarefa
-        if random.random() > 0.2:
-            complete_task(task_id)
-        else:
-            print(f"⚠️ Worker abandoned Task {task_id}!")
-
 def complete_task(task_id):
     """Simula trabalhadores concluindo a tarefa"""
     payload = {"id": task_id, "success": True}
     socket.emit("task_completed", payload)
     print(f"✅ Task {task_id} completed!")
-
-def check_status():
-    """Verifica o status do sistema"""
-    response = requests.get(f"{BASE_URL}/api/check/status")
-    print("🔍 System Status:", response.json())
 
 def get_queue():
     """Verifica a fila de tarefas"""
@@ -77,10 +54,6 @@ threads = [
     threading.Thread(target=generate_lyrics),
     threading.Thread(target=generate_lyrics),
     threading.Thread(target=generate_lyrics),
-    threading.Thread(target=process_task),
-    threading.Thread(target=process_task),
-    threading.Thread(target=process_task),
-    threading.Thread(target=check_status),
     threading.Thread(target=get_queue),
 ]
 

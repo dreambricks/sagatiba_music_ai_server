@@ -11,5 +11,12 @@ def on_error(data):
     print(f"Erro recebido: {data}")
 
 sio.connect('http://localhost:5001')
-sio.emit('request_audio_url', { "task_id": "3d942c29-cebf-4584-a098-354c5e9826fa", "phone": "11996984576"})
+# sio.emit('request_audio_url', { "task_id": "3d942c29-cebf-4584-a098-354c5e9826fa", "phone": "11996984576"})
+sio.emit('get_queue')
+
+@sio.on("queue_list")
+def on_queue_list(data):
+    """Recebe a lista da fila de tarefas"""
+    print("📊 Current Queue:", data)
+
 sio.wait()
