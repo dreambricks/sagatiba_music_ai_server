@@ -11,7 +11,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from utils.openai_util import moderation_ok, generate_lyrics
-from utils.twilio_util import send_whatsapp_download_message, send_whatsapp_message
+from utils.sms_util import send_sms_download_message, send_sms_message
 from utils.error_util import save_system_error
 
 from config.mongo_config import mongo, init_mongo
@@ -137,7 +137,7 @@ def generate_task_id():
     lyrics = data.get("lyrics")
     phone = data.get("phone")
     message = "Oi Sagalover! Sua música está sendo preparada."
-    send_whatsapp_message(message, phone)
+    send_sms_message(message, phone)
     if not lyrics:
         logger.info(f"Task not enqueued for phone: {phone}")
         return jsonify({"error": "Lyrics parameter is missing"}), 400
@@ -230,7 +230,7 @@ def request_audio(json):
 
     # Envia mensagem via WhatsApp
     message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={id}"
-    send_whatsapp_download_message(message_url, phone)
+    send_sms_download_message(message_url, phone)
 
     # Responde ao WebSocket com os áudios encontrados
     emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
