@@ -10,6 +10,8 @@ from utils.openai_util import moderation_ok, generate_lyrics
 from utils.twilio_util import send_whatsapp_message
 import time
 import re
+import utils.audio_util as audio_util
+import utils.db_util as db_util
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,8 @@ def test_upload_song(song_filename=None):
         logger.info(f"uploading song {song_filename}")
     else:
         logger.info("uploading song")
-    musicapi.upload_song(song_filename)
+    result = musicapi.upload_song(song_filename)
+    logger.info(result)
 
 
 def store_audio(url, prefix=None, max_size=1177 * 1024):
@@ -55,6 +58,18 @@ def store_audio(url, prefix=None, max_size=1177 * 1024):
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
         return None # jsonify({"error": str(e)}), 500
+
+
+def store_audio_and_fade_out(url, task_id, max_size=1177*1024):
+    filepath = store_audio(url, task_id, max_size)
+
+    if filepath is None:
+        return None
+
+    faded_filepath = db_util.add_suffix_to_filepath(filepath, "f")
+    audio_util.fade_out(filepath, faded_filepath)
+
+    return faded_filepath
 
 
 def get_task_id_from_url(url):
@@ -265,7 +280,7 @@ Domingo de cachaça, não podemos parar!
         lyrics = lyrics_list[lyric_id]
 
     logger.info("Creating Music")
-    task_id = musicapi.create_music2(lyrics)
+    task_id = musicapi.create_music1(lyrics)
     #task_id = musicapi.create_music3(lyrics, continue_clip_id, continue_at)
     logger.info(f"Music created with task_id: {task_id}")
     for t in range(200):
@@ -343,7 +358,8 @@ def test_generate_lyrics(destination, invite_options, weekdays, message):
     is_ok, error_msg = moderation_ok(destination, message)
 
     if is_ok:
-        lyrics = generate_lyrics(destination, invite_options, weekdays, message)
+        lyrics_path = "static/lyrics"
+        lyrics = generate_lyrics(destination, invite_options, weekdays, message, lyrics_path)
         logger.info(f"Letras geradas: {lyrics}")
         return lyrics
     else:
@@ -355,7 +371,7 @@ def test_lyrics_generation():
     destination = "José"
     invite_options = "beber em casa"
     weekdays = "Domingo"
-    message = "amarelo"
+    message = "carro amarelo"
 
     lyrics = test_generate_lyrics(destination, invite_options, weekdays, message)
     logger.warning(lyrics)
@@ -423,6 +439,12 @@ def test_manual_music_generation(lyrics):
     test_manual_get_music(task_id)
 
 
+def test_fade_out():
+    input_mp3 = "static/mp3/sagatiba_5f9556aa-7a4a-497a-9a18-af3eb903b6ff.mp3"
+    output_mp3 = "static/mp3/sagatiba_fade_out.mp3"
+    audio_util.fade_out(input_mp3, output_mp3)
+
+
 if __name__ == "__main__":
     lyrics2 = """
     **Introdução:**  
@@ -479,11 +501,12 @@ if __name__ == "__main__":
     Os donos do show. 
     """
 
+    #test_fade_out()
     #test_create_song(lyric_id=1)
 
     #test_manual_get_music("967b4f04-b52e-41a2-b458-f5e9435adc8f")
 
-    test_manual_music_generation(lyrics2)
+    #test_manual_music_generation(lyrics2)
     #test_music_generation(song_cut="vai_la_02.mp3")#, tags="female voices only, sertanejo, back vocals, 30 seconds long")
     #test_music_generation(song_cut="grave_01.mp3", lyrics=lyrics, tags="sertanejo, country, back vocals, strong female voice, joyfully, uplifting")
     #test_upload_song("trechos/vai_la_02.mp3")

@@ -1,46 +1,65 @@
+import logging
+import csv
+import os
 import http.client
 import json
 from time import sleep
+from datetime import datetime
+import shutil
 
-clip_id = None  # Variável global para armazenar o clip_id
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-def set_clip_id(new_clip_id):
-    """Define um novo clip_id para ser acessado globalmente."""
-    global clip_id
-    clip_id = new_clip_id
+CLIP_ID_DIR = "storage"
+CLIP_ID_FILE = os.path.join(CLIP_ID_DIR, "clip_id.csv")
+
+def generate_new_task_id():
+    return uuid.uuid4()
+
+# Atualização da função set_clip_id e get_clip_id para usar CSV
+def set_clip_id(clip_id, timestamp):
+    os.makedirs(CLIP_ID_DIR, exist_ok=True) 
+    with open(CLIP_ID_FILE, "a", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([clip_id, timestamp])
+    logger.info(f"Saved clip_id: {clip_id} at {timestamp}")
 
 def get_clip_id():
-    """Retorna o último clip_id salvo."""
-    return clip_id
+    if os.path.exists(CLIP_ID_FILE):
+        with open(CLIP_ID_FILE, "r") as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+            if rows:
+                return {"clip_id": rows[-1][0], "timestamp": rows[-1][1]}
+    logger.info("No Clip ID found.")
+    return None
+
+def clear_clip_id_file():
+    if os.path.exists(CLIP_ID_FILE):
+        os.remove(CLIP_ID_FILE)
+        logger.info("[SCHEDULER] clip_id.csv file cleaned before starting the scheduler.")
 
 def get_task_id(data):
     try:
-        # Extract the task_id value
         task_id = data.get("task_id")
-
+        logger.info(f"Task ID extracted: {task_id}")
         return task_id
     except json.JSONDecodeError:
-        # Handle the case where the input is not a valid JSON string
-        print("Invalid JSON string")
+        logger.error("Invalid JSON string")
         return None
-
 
 def get_audio_url(result):
     try:
         data = json.loads(result)
         audio_urls = [item.get("audio_url") for item in data.get("data", [])]
-        print(audio_urls)
-
-        if audio_urls and audio_urls[0]:
-            return audio_urls
-
+        logger.info(f"Audio URLs extracteds: {audio_urls}")
+        return audio_urls if audio_urls and audio_urls[0] else None
     except json.JSONDecodeError:
-        # Handle the case where the input is not a valid JSON string
-        print("Invalid JSON string")
+        logger.error("Invalid JSON string")
         return None
 
-
 def create_music1(lyrics):
+    logger.info("Creating music 1")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         "custom_mode": True,
@@ -53,16 +72,15 @@ def create_music1(lyrics):
         'Content-Type': 'application/json',
         'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
     }
-
     conn.request("POST", "/api/v1/sonic/create", payload, headers)
     res = conn.getresponse()
     data = res.read()
     result = data.decode("utf-8")
-    print(result)
+    logger.info(f"API response (create_music2): {result}")
     return get_task_id(result)
 
-
 def create_persona():
+    logger.info("Creating persona")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         "name": "MM01",
@@ -76,17 +94,14 @@ def create_persona():
     conn.request("POST", "/api/v1/sonic/persona", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    print(data.decode("utf-8"))
-
+    logger.info(f"API response (create_persona): {data.decode('utf-8')}")
 
 def upload_song(host_url):
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload_url = f"{host_url}static/trechos/vai_la_02.mp3"
-    print(payload_url)
-    payload = json.dumps({
-        # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
-        "url": payload_url
-    })
+    logger.info(f"Music upload started with URL: {payload_url}")
+    payload = json.dumps({"url": payload_url})         # "url":"https://audio.jukehost.co.uk/wTybKVrMkkZ8LU2JmTYeA2Iad7lKxCNL"
+
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
@@ -95,19 +110,23 @@ def upload_song(host_url):
     res = conn.getresponse()
     data = res.read()
     result = data.decode("utf-8")
+    logger.info(f"API response (upload_song): {result}")
     return result
 
 def create_music2(lyrics):
+    logger.info("Creating music 2")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = json.dumps({
         "task_type": "persona_music",
         "custom_mode": True,
         "prompt": lyrics,
-        "tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
-        "persona_id": "804f9d62-bef4-436d-813d-48fc54847e8e",  # generated in the API
-        # "persona_id": "6e2bf4db-6ba5-408a-aa5e-9eb1fc1641f1", # generated in SUNO
-        "continue_clip_id": "838d8482-10fe-475b-8ae4-cae5eea5c98e",
-        "mv": "sonic-v3-5"
+        #"tags": "sertanejo, country, back vocals, strong female voice, joyfully, uplifting",
+        #"persona_id": "3c480613-4ec4-44c8-895f-080e8c683964",  # generated in the API persona MM2
+        #"continue_clip_id": "33fae5fb-f72c-4251-a9b4-0167f23699ad",
+        "tags": "sertanejo, two female voices, back vocals",
+        "persona_id": "c0de1239-534f-4cdf-88aa-8f728b1515e2",  # generated using Suno persona: SunoPersonaI
+        "continue_clip_id": "8c0e2762-2ea3-4cfe-85b6-8264200a29cd",
+        "mv": "sonic-v4"
     })
     headers = {
         'Content-Type': 'application/json',
@@ -117,13 +136,32 @@ def create_music2(lyrics):
     conn.request("POST", "/api/v1/sonic/create", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    result = data.decode("utf-8")
-    print(result)
+    result = json.loads(data.decode("utf-8"))
+    logger.info(f"API response (create_music2): {result}")
     return get_task_id(result)
 
 
 def create_music3(lyrics):
+    logger.info("Creating music 3")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
+    clip_data = get_clip_id()
+    clip_id = clip_data.get("clip_id") if clip_data else None
+    
+    if clip_id is None:
+        logger.info("No clip_id found, uploading music...")
+        response = upload_song(os.getenv("HOST_URL"))
+        if response:
+            try:
+                data = json.loads(response)
+                if data.get("code") == 200 and "clip_id" in data:
+                    clip_id = data["clip_id"]
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    set_clip_id(clip_id, timestamp)
+                    logger.info(f"Saved new clip_id: {clip_id}")
+            except json.JSONDecodeError:
+                logger.error("Error decoding JSON response from upload_song")
+                return "[ERROR] Error decoding JSON response from upload_song"
+    
     payload = json.dumps({
         "task_type": "extend_upload_music",
         "custom_mode": True,
@@ -138,43 +176,137 @@ def create_music3(lyrics):
         'Authorization': 'Bearer 6f3be2db59c7afa567d97bdf01626fc8'
     }
 
+    logger.info("Sending request for music creation...")
     conn.request("POST", "/api/v1/sonic/create", payload, headers)
     res = conn.getresponse()
     data = res.read()
     result = json.loads(data.decode("utf-8"))
-
+    logger.info(f"API response (create_music3): {result}")
+    
     # Check the HTTP status code to handle errors
     if res.status == 401:  # Unauthorized
-        if 'Authorization header is missing.' in result['error']:
+        logger.error("Erro 401: Unauthorized")
+        if 'Authorization header is missing.' in result.get('error', ''):
             return "Error: Authorization header is missing."
-        elif 'Invalid authorization format.' in result['error']:
+        elif 'Invalid authorization format.' in result.get('error', ''):
             return "Error: Invalid authorization format."
     elif res.status == 403:  # Forbidden
-        if 'The lyrics contain copyrighted content:' in result['error']:
+        logger.error(f"Erro 403: Forbidden - {result.get('error', '')}")
+        if 'The lyrics contain copyrighted content:' in result.get('error', ''):
             return f"Error: {result['error']}"
-        elif 'The lyrics contain inappropriate content:' in result['error']:
+        elif 'The lyrics contain inappropriate content:' in result.get('error', ''):
             return f"Error: {result['error']}"
-        elif 'The song description needs moderation review.' in result['error']:
+        elif 'The song description needs moderation review.' in result.get('error', ''):
             return "Error: Song description needs moderation."
         else:
             return f"Error: {result['error']}"
     elif res.status == 400:  # Bad Request
-        if 'task not found.' in result['error']:
+        logger.error("Erro 400: Bad Request - Task not found")
+        if 'task not found.' in result.get('error', ''):
             return "Error: Task not found."
     elif res.status == 500:  # Server Error
+        logger.error("Erro 500: Internal Server Error")
         return "Error: Internal Server Error."
     elif res.status == 504:  # Timeout
+        logger.error("Erro 504: Timeout")
         return "Error: Task failed due to timeout. Credits were refunded."
     else:
-        return get_task_id(result)  # Proceed normally if there are no errors.
+        logger.info("Music successfully created, getting task_id")
+        return get_task_id(result)
+
+def create_lyrics_filepath(task_id):
+    path = f"static/tasks"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    filename = f"{task_id}.txt"
+
+    return os.path.join(path, filename)
+
+def create_music_json_filepath(task_id):
+    path = f"static/tasks/results"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    filename = f"{task_id}.json"
+    return os.path.join(path, filename)
+
+def create_music4(lyrics):
+    task_id = generate_new_task_id()
+    filepath = create_lyrics_filepath(task_id)
+    with open(filepath, "w") as f:
+        f.write(f"cp mm.json {task_id}.json\n\n")
+        f.write(lyrics)
+        f.write('\n')
+
+    return task_id
 
 
 def create_music(lyrics):
-    # return create_music01(lyrics) # no persona
-    return create_music3(lyrics)
+    return create_music4(lyrics)
 
 
-def get_music(task_id): 
+def wait_for_file(filepath: str) -> str:
+    """
+    Continuously checks if a file exists. Once found, reads and returns its contents.
+
+    :param filepath: The path to the file to check.
+    :return: The filepath if the file was found and None if not.
+    """
+    count = 0
+    while not os.path.exists(filepath) and count < 1200:
+        time.sleep(1)  # Wait 1 second before checking again
+        count += 1
+
+    return filepath if os.path.exists(filepath) else None
+
+
+def read_audio_urls(filepath: str) -> list:
+    """
+    Reads a JSON file and extracts values from 'audio1' and 'audio2' fields.
+
+    :param filepath: The path to the JSON file.
+    :return: A list containing the values of 'audio1' and 'audio2'.
+    """
+    with open(filepath, 'r', encoding='utf-8') as file:
+        data = json.load(file)
+
+    return [data.get("audio1"), data.get("audio2")]
+
+
+def get_task_result_json(filepath):
+    try:
+        filepath = wait_for_file(filepath)
+        if filepath is None:
+            return None
+
+        return read_audio_urls(filepath)
+
+    except:
+        return None
+
+
+def collect_music_garbage(task_id):
+    garbage_path = "static/tasks/done"
+
+    lyrics_filepath = create_lyrics_filepath(task_id)
+    links_filepath = create_music_json_filepath(task_id)
+    shutil.move(lyrics_filepath, garbage_path)
+    shutil.move(links_filepath, garbage_path)
+
+
+def get_music2(task_id):
+    filepath = create_music_json_filepath(task_id)
+    result = get_task_result_json(filepath)
+
+    if result is not None:
+        collect_music_garbage(task_id)
+
+    return result
+
+
+def get_music(task_id):
+    logger.info(f"Searching for music for task_id: {task_id}")
     conn = http.client.HTTPSConnection("api.musicapi.ai")
     payload = ""
     headers = {
@@ -183,21 +315,23 @@ def get_music(task_id):
     conn.request("GET", f"/api/v1/sonic/task/{task_id}", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    
     result = data.decode("utf-8")
 
     try:
         message = json.loads(result)  # Decodifica a resposta JSON
     except json.JSONDecodeError:
+        logger.error("Error: Unable to decode server response.")
         return "Error: Unable to decode server response."
 
     # Check the HTTP status code to handle errors
     if res.status == 401:  # Unauthorized
+        logger.error("Erro 401: Unauthorized")
         if 'Authorization header is missing.' in message.get('error', ''):
             return "Error: Authorization header is missing."
         elif 'Invalid authorization format.' in message.get('error', ''):
             return "Error: Invalid authorization format."
     elif res.status == 403:  # Forbidden
+        logger.error(f"Erro 403: Forbidden - {message.get('error', '')}")
         if 'The lyrics contain copyrighted content:' in message.get('error', ''):
             return f"Error: {message['error']}"
         elif 'The lyrics contain inappropriate content:' in message.get('error', ''):
@@ -207,85 +341,81 @@ def get_music(task_id):
         else:
             return f"Error: {message['error']}"
     elif res.status == 400:  # Bad Request
+        logger.error("Erro 400: Bad Request - Task not found")
         if 'task not found.' in message.get('error', ''):
             return "Error: Task not found."
     elif res.status == 500:  # Server Error
+        logger.error("Erro 500: Internal Server Error")
         return "Status: Music is still being processed. Please wait."
     elif res.status == 504:  # Timeout
+        logger.error("Erro 504: Timeout")
         return "Error: Task failed due to timeout. Credits were refunded."
     else:
-        # Proceed normally if there are no errors.
-        print(f"Data is: {data}")
-        print(f"Result is: {result}")
-
+        logger.info("Musics found, returning audio URLs.")
+        logger.info(f"Data: {data}")
+        logger.info(f"Result: {result}")
         return get_audio_url(result)
 
 def test_create_persona():
     create_persona()
 
-
 def test_upload_song():
-    print("uploading song")
-    upload_song()
-
+    logger.info("Starting music upload test")
+    upload_song(os.getenv("HOST_URL"))
 
 def test_create_song():
     task_id = '19cc9ebd-f1a2-4346-8211-c86a17697a1a'
     title = "Sagatiba"
     lyrics = """
-[Intro]
-E aí, galera. Bora seguir na saga? 
-Essa música é pra quem faz acontecer. 
-Pra quem é da equipe. 
-E sabe seguir na saga. 
+        [Intro]
+        E aí, galera. Bora seguir na saga? 
+        Essa música é pra quem faz acontecer. 
+        Pra quem é da equipe. 
+        E sabe seguir na saga. 
 
-[Verse1]
-Então bora? 
-Bora levar Sagatiba pra cada esquina. 
-Pra cada mesa de bar. 
-Pra cada conversa gostosa. 
+        [Verse1]
+        Então bora? 
+        Bora levar Sagatiba pra cada esquina. 
+        Pra cada mesa de bar. 
+        Pra cada conversa gostosa. 
 
-[Chorus]
-Pra quem tá na rua. 
-Pra quem tá na loja. 
-Os donos do show. 
-Pra quem tá na rua. 
-Pra quem tá na loja. 
-Os donos do show. 
+        [Chorus]
+        Pra quem tá na rua. 
+        Pra quem tá na loja. 
+        Os donos do show. 
+        Pra quem tá na rua. 
+        Pra quem tá na loja. 
+        Os donos do show. 
 
-[Verse2]
-Essa música é pra quem faz sucesso. 
-Pra quem faz Sagatiba brilhar. 
-Pra quem tem Sagatiba no coração. 
-E coloca Sagatiba no copo. 
+        [Verse2]
+        Essa música é pra quem faz sucesso. 
+        Pra quem faz Sagatiba brilhar. 
+        Pra quem tem Sagatiba no coração. 
+        E coloca Sagatiba no copo. 
 
-[Chorus]
-Pra quem tá na rua. 
-Pra quem tá na loja. 
-Os donos do show.
-Pra quem tá na rua. 
-Pra quem tá na loja. 
-Os donos do show. 
-"""
+        [Chorus]
+        Pra quem tá na rua. 
+        Pra quem tá na loja. 
+        Os donos do show.
+        Pra quem tá na rua. 
+        Pra quem tá na loja. 
+        Os donos do show. 
+        """
 
-    print("Creating Music")
+    logger.info("Creating test music")
     task_id = create_music(lyrics)
-    print(f"Music created with task_id: {task_id}")
+    logger.info(f"Music created with task_id: {task_id}")
     while True:
-        print("Waiting...")
-        for i in range(10):
-            print(i)
-            sleep(1)
+        logger.info("Waiting for processing...")
+        sleep(10)
         try:
             audio_url = get_music(task_id)
             if audio_url:
                 break
         except:
             pass
-
-    print(f"download the music from: {audio_url}")
-
+    logger.info(f"Download at: {audio_url}")
 
 if __name__ == "__main__":
     test_upload_song()
-    #test_create_song()
+    # test_create_song()

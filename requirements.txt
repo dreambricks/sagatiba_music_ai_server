@@ -278,3 +278,8 @@ yarl==1.18.3
 #zipp==3.21.0
 #zope.interface==6.1
 #zstandard==0.23.0
+asyncio==3.4.3
+pymongo==4.11.1
+flask_pymongo==3.0.1
+bson==0.5.10
+bcrypt==4.2.1

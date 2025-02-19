@@ -1,0 +1,119 @@
+{
+    "info": {
+        "_postman_id": "b58e5b3e-8b30-4dd7-9d63-1b3a50e5a9c5",
+        "name": "Sagatiba API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Register User",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"email\": \"test@example.com\",\n    \"password_hash\": \"mypassword\"\n}"
+                },
+                "url": {
+                    "raw": "http://localhost:5001/api/users/register",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "api",
+                        "users",
+                        "register"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Log User Event",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"user_oid\": \"5f9b3b3b9d9f3d0001a3b3b3\",\n    \"action\": \"accepted_task\",\n    \"redis_id\": \"task_123\",\n    \"phone\": \"11987654321\",\n    \"lyrics\": \"Test lyrics\"\n}"
+                },
+                "url": {
+                    "raw": "http://localhost:5001/api/events/log",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "api",
+                        "events",
+                        "log"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Save Generated Audio",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"redis_id\": \"task_123\",\n    \"phone\": \"11987654321\",\n    \"lyrics\": \"Sample lyrics\",\n    \"audio_urls\": [\"https://example.com/audio.mp3\"]\n}"
+                },
+                "url": {
+                    "raw": "http://localhost:5001/api/audios/save",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "api",
+                        "audios",
+                        "save"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Check System Status",
+            "request": {
+                "method": "GET",
+                "url": {
+                    "raw": "http://localhost:5001/api/check/status",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "api",
+                        "check",
+                        "status"
+                    ]
+                }
+            },
+            "response": []
+        }
+    ]
+}

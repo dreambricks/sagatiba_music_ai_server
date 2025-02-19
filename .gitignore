@@ -165,7 +165,8 @@ cython_debug/
 
 .pem
 /priv
-test_socket.py
 
-/temp
 /static/mp3
+storage
+storage/clip_id.csv
+nohup.out
