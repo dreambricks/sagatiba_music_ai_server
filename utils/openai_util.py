@@ -111,22 +111,39 @@ def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
     elif opcao == "ROLÊ EM CASA":
         opcao = "beber cachaça sagatiba em casa"
     elif opcao == "HAPPY HOUR":
-        opcao = "happy hour com cachaça sagatiba"
+        opcao = "o happy hour com cachaça sagatiba"
     elif opcao == "SEXTOU":
         opcao = "sextou com cachaça sagatiba"
+        dia_semana = "Sexta"
     elif opcao == "ANIVERSÁRIO":
-        opcao = "aniversário com cachaça sagatiba"
+        opcao = "o aniversário com cachaça sagatiba"
     elif opcao == "FESTA":
-        opcao = "festa com cachaça sagatiba"
+        opcao = "a festa com cachaça sagatiba"
     elif opcao == "SHOW":
-        opcao = "show com cachaça sagatiba"
+        opcao = "o show com cachaça sagatiba"
+
+    dia_semana_str = ""
+    dia_semana_str2 = ""
+    if dia_semana != "Qualquer dia é dia":
+        dia_semana_str = f"o dia da semana é {dia_semana}, "
+        dia_semana_str2 = "no dia especificado"
 
     prompt = (
-        f"Crie a letra de uma música. O convidado é {convidado}, a ocasião é '{opcao}', "
-        f"o dia da semana é {dia_semana} e o recado adicional é: '{recado}'. "
-        f"A letra deve ser divertida, criativa e com rima."
-        "A letra deve conter exatamente uma introdução, um verso e um refrão."
-        "A letra não pode incentivar o consumo exagerado, compulsivo ou irresponsável de álcool."
+        #f"Crie a letra de uma música."
+        "Crie a letra de um convite musical. "
+        f"O convidado é {convidado}, {dia_semana_str} "    
+        f"a ocasião é '{opcao}' "
+        f"e o recado adicional é: '{recado}'. "
+        f"A letra deve ser divertida, criativa e com rima. "
+        #"A letra deve conter exatamente uma introdução, um verso e um refrão. "
+        "A letra deve conter somente uma introdução, um verso e uma finalização."
+        f"A introdução deve conter três frases, deve ser marcada com a tag [intro] e deve chamar o convidado para {opcao} {dia_semana_str2}. "
+        "A primeira frase da introdução deve ser obrigatóriamente: Vamos brindar com Sagatiba!"
+        "O nome do convidado deve aparecer na segunda frase da introdução."
+        "O verso deve conter duas frases e deve ser marcado com a tag [verse]."
+        "A finalização deve conter duas frases e deve ser marcada com a tag [outro]."
+        "A letra não pode conter a palavra delícia."
+        "A letra não pode incentivar o consumo exagerado, compulsivo ou irresponsável de álcool. "
         "A letra não pode sugerir que o consumo de bebidas alcoólicas traz sucesso pessoal, profissional, esportivo, social ou sexual."
     )
 
