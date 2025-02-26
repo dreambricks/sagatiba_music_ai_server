@@ -64,8 +64,8 @@ def login_user():
     }
     mongo.db.UsersEvents.insert_one(event_data)
 
-    # return jsonify({"message": "Login successful", "user_oid": user["_id"], "token": token}), 200
-    return jsonify({"message": "Login successful", "token": token}), 200
+    return jsonify({"message": "Login successful", "user_oid": user["_id"], "token": token}), 200
+    # return jsonify({"message": "Login successful", "token": token}), 200
 
 
 @user_bp.route("/events/log", methods=["POST"])

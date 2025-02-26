@@ -233,7 +233,7 @@ def request_audio(json):
     send_sms_download_message(message_url, phone)
 
     # Responde ao WebSocket com os áudios encontrados
-    emit('audio_response', {'audio_urls': local_audio_urls}, namespace='/')
+    emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
 
 # Registrar rotas do Mongo
 app.register_blueprint(user_bp, url_prefix="/api")
