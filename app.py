@@ -9,6 +9,7 @@ from flask_cors import CORS
 from flask_socketio import emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_mail import Mail
 
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.sms_util import send_sms_download_message, send_sms_message
@@ -46,6 +47,30 @@ CORS(app)
 init_mongo(app)
 socketio.init_app(app)
 
+#Incializar o servidor de email
+mail = Mail()
+
+if os.getenv('LOCAL_SERVER'):
+    app.config.update(
+        MAIL_SERVER='localhost',
+        MAIL_PORT=8025,
+        MAIL_USE_TLS=False,
+        MAIL_USERNAME=None,
+        MAIL_PASSWORD=None,
+        MAIL_DEFAULT_SENDER=('Segue na Saga', 'no-reply@seguenasaga.sagatiba.com')
+    )
+else: 
+    app.config.update(
+        MAIL_SERVER='smtp.seguenasaga.sagatiba.com',
+        MAIL_PORT=587,
+        MAIL_USE_TLS=True,
+        MAIL_USERNAME='sagatiba@seguenasaga.sagatiba.com',
+        MAIL_PASSWORD=os.getenv('EMAIL_SECRET_KEY'),
+        MAIL_DEFAULT_SENDER=('Segue na Saga', 'no-reply@seguenasaga.sagatiba.com')
+    )
+    
+mail.init_app(app)
+
 redis_host = "localhost"
 redis_port = 6379
 # Configuração dos bancos de dados Redis
@@ -55,7 +80,6 @@ lyrics_db = redis.Redis(host=redis_host, port=redis_port, db=1) # Banco para arm
 limiter_redis_url = "redis://localhost:6379/2"
 error_db = redis.Redis(host=redis_host, port=redis_port, db=3)
 processing_db = redis.Redis(host=redis_host, port=redis_port, db=4)  # Armazena tarefas em processamento
-
 
 # Configuração do Rate Limiter no DB 2
 limiter = Limiter(
