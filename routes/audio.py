@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from config.mongo_config import mongo
 from schemas.generated_audios import GeneratedAudioSchema
-from schemas.user_events import UserEventSchema
+from schemas.worker_events import WorkerEventSchema
 from bson import ObjectId
 from datetime import datetime, timezone
 import utils.db_util as db_util
@@ -73,7 +73,7 @@ def save_generated_audio():
             "lyrics": lyrics,
             "timestamp": datetime.now(timezone.utc)
         }
-        event = UserEventSchema(**event_data)
+        event = WorkerEventSchema(**event_data)
         mongo.db.UsersEvents.insert_one(event.model_dump())
 
         # Emitir sinal para notificar que os áudios foram gerados
@@ -139,7 +139,7 @@ def save_generated_audio_from_url():
             "lyrics": lyrics,
             "timestamp": datetime.now(timezone.utc)
         }
-        event = UserEventSchema(**event_data)
+        event = WorkerEventSchema(**event_data)
         mongo.db.UsersEvents.insert_one(event.model_dump())
 
         # Emitir sinal para notificar que os áudios foram gerados

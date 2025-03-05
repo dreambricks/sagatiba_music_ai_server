@@ -15,7 +15,7 @@ def check_object_id(value: str) -> str:
 ObjectId = Annotated[str, AfterValidator(check_object_id)]
 
 
-class UserEventSchema(BaseModel):
+class WorkerEventSchema(BaseModel):
     user_oid: ObjectId
     action: str  # "accepted_task", "completed_task"
     redis_id: str
