@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from pydantic import BaseModel
-from typing import Optional
 from bson import ObjectId as _ObjectId
 from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
@@ -22,4 +21,4 @@ class UserEventSchema(BaseModel):
     redis_id: str
     phone: str
     lyrics: str
-    timestamp: Optional[datetime] = datetime.now(timezone.utc)
+    timestamp: datetime = datetime.now(timezone.utc)

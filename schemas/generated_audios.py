@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 
 class GeneratedAudioSchema(BaseModel):
@@ -8,4 +8,4 @@ class GeneratedAudioSchema(BaseModel):
     phone: str
     lyrics: str
     audio_urls: List[str]  # Lista de URLs dos áudios gerados
-    timestamp: Optional[datetime] = datetime.now(timezone.utc)
+    timestamp: datetime = datetime.now(timezone.utc)
