@@ -6,7 +6,7 @@ def send_verification_email(email, verification_link):
 
     msg = Message(
         subject="Confirme seu e-mail",
-        sender="no-reply@seusite.com",
+        sender="guilhermebegotti@dreambricks.com.br",
         recipients=[email]
     )
     msg.body = f"Por favor, clique no link para confirmar seu e-mail: {verification_link}"
@@ -24,7 +24,7 @@ def send_reset_email(email, reset_link):
 
     msg = Message(
         subject="Redefinição de Senha - Segue na Saga",
-        sender="no-reply@seguenasaga.sagatiba.com",
+        sender="guilhermebegotti@dreambricks.com.br",
         recipients=[email]
     )
     msg.body = f"Para redefinir sua senha, clique no link: {reset_link}"

@@ -50,25 +50,25 @@ socketio.init_app(app)
 #Incializar o servidor de email
 mail = Mail()
 
-if os.getenv('LOCAL_SERVER'):
-    app.config.update(
-        MAIL_SERVER='localhost',
-        MAIL_PORT=8025,
-        MAIL_USE_TLS=False,
-        MAIL_USERNAME=None,
-        MAIL_PASSWORD=None,
-        MAIL_DEFAULT_SENDER=('Segue na Saga', 'no-reply@seguenasaga.sagatiba.com')
-    )
-else: 
-    app.config.update(
-        MAIL_SERVER='smtp.seguenasaga.sagatiba.com',
-        MAIL_PORT=587,
-        MAIL_USE_TLS=True,
-        MAIL_USERNAME='sagatiba@seguenasaga.sagatiba.com',
-        MAIL_PASSWORD=os.getenv('EMAIL_SECRET_KEY'),
-        MAIL_DEFAULT_SENDER=('Segue na Saga', 'no-reply@seguenasaga.sagatiba.com')
-    )
-    
+# if os.getenv('LOCAL_SERVER'):
+#     app.config.update(
+#         MAIL_SERVER='localhost',
+#         MAIL_PORT=8025,
+#         MAIL_USE_TLS=False,
+#         MAIL_USERNAME=None,
+#         MAIL_PASSWORD=None,
+#         MAIL_DEFAULT_SENDER=('Segue na Saga', 'guilhermebegotti@dreambricks.com.br')
+#     )
+# else: 
+app.config.update(
+    MAIL_SERVER='smtp-relay.brevo.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USERNAME=os.getenv('EMAIL_USER'),
+    MAIL_PASSWORD= os.getenv('EMAIL_SECRET_KEY'),
+    MAIL_DEFAULT_SENDER=('Segue na Saga', 'guilhermebegotti@dreambricks.com.br')
+)
+
 mail.init_app(app)
 
 redis_host = "localhost"
