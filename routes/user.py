@@ -17,6 +17,12 @@ from datetime import datetime, timezone
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+private_key_path = os.path.join(BASE_DIR, '..', 'priv', 'privkey.pem')
+
+with open(private_key_path, "r") as f:
+    private_key = f.read()
+
 user_bp = Blueprint("user_bp", __name__)
 
 @user_bp.route("/users/register", methods=["POST"])
@@ -77,6 +83,36 @@ def verify_email(token):
 
     except BadSignature:
         return jsonify({"error": "O link de verificação é inválido."}), 400
+
+@user_bp.route("/users/login", methods=["POST"])
+def login_user():
+    """Verifica as credenciais do usuário e retorna um token de autenticação"""
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"error": "Email e senha são necessários para o login"}), 400
+
+    # Buscar usuário no banco de dados
+    user = mongo.db.Users.find_one({"email": email, "validated": True})
+    
+    if not user:
+        return jsonify({"error": "Email ou senha inválidos"}), 401
+
+    # Comparar a senha fornecida com o hash armazenado
+    if not bcrypt.checkpw(password.encode('utf-8'), user["password_hash"].encode('utf-8')):
+        return jsonify({"error": "Email ou senha inválidos"}), 401
+
+    # Gerar token JWT (caso precise autenticação)
+    token_payload = {
+        "user_oid": str(user["_id"]),
+        "email": email,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=2)  # Expira em 2 horas
+    }
+    token = jwt.encode(token_payload, private_key, algorithm="ES256")
+
+    return jsonify({"message": "Login feito com sucesso", "token": token}), 200
 
 @user_bp.route("/users/worker/register", methods=["POST"])
 def register_worker():
