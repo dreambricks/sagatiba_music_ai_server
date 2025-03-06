@@ -3,7 +3,7 @@ import jwt
 import os
 from datetime import datetime, timedelta, timezone
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from utils.email_utils import send_verification_email
+from utils.email_utils import send_verification_email, send_reset_email
 from flask import request, jsonify, url_for, redirect
 from config.mongo_config import mongo
 from schemas.users import UserSchema
@@ -33,10 +33,14 @@ def register_user():
     password_hash = data.get("password_hash")
     user_info_hash = data.get("user_info_hash")
 
-    
     if not email or not password_hash or not user_info_hash:
-        return jsonify({"error": "Não foi possível concluir o cadastro do usuário, dados estão incompletos"}), 400
-    
+        return jsonify({"error": "Dados incompletos para o cadastro do usuário."}), 400
+
+    # Verifica se o e-mail já está registrado
+    existing_user = mongo.db.Users.find_one({"email": email})
+    if existing_user:
+        return jsonify({"error": "E-mail já registrado. Utilize outro e-mail para o cadastro."}), 409
+
     save_data = {
         "email": email,
         "password_hash": bcrypt.hashpw(password_hash.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
@@ -56,9 +60,10 @@ def register_user():
         verification_link = url_for('user_bp.verify_email', token=token, _external=True)
         send_verification_email(email, verification_link)
 
-        return jsonify({"message": "Ususuário registrado com sucesso"}), 201
+        return jsonify({"message": "Usuário registrado com sucesso."}), 201
     except Exception as e:
-        return jsonify({"error": f"Não foi possível concluir o cadastro do usuário, erro ao salvar os dados: {str(e)}"}), 400
+        return jsonify({"error": f"Erro ao salvar o usuário: {str(e)}"}), 400
+
 
 @user_bp.route("/users/verify_email/<token>", methods=["GET"])
 def verify_email(token):
@@ -113,6 +118,62 @@ def login_user():
     token = jwt.encode(token_payload, private_key, algorithm="ES256")
 
     return jsonify({"message": "Login feito com sucesso", "token": token}), 200
+
+@user_bp.route("/users/forgot_password", methods=["POST"])
+def forgot_password():
+    """Envia e-mail para recuperação de senha"""
+    data = request.json
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "E-mail obrigatório para recuperação de senha"}), 400
+
+    # Verifica se o usuário existe no banco
+    user = mongo.db.Users.find_one({"email": email})
+    if not user:
+        return jsonify({"error": "E-mail não encontrado"}), 404
+
+    # Gera um token de recuperação de senha com validade de 1 hora (3600 segundos)
+    token = serializer.dumps(str(user["_id"]), salt="password-reset-salt")
+
+    # Envia o e-mail de recuperação
+    reset_link = url_for('user_bp.reset_password', token=token, _external=True)
+    send_reset_email(email, reset_link)
+
+    return jsonify({"message": "E-mail de recuperação de senha enviado com sucesso."}), 200
+
+@user_bp.route("/users/reset_password/<token>", methods=["POST"])
+def reset_password(token):
+    """Redefine a senha do usuário com base no token de recuperação"""
+    data = request.json
+    new_password = data.get("new_password")
+
+    if not new_password:
+        return jsonify({"error": "A nova senha é obrigatória"}), 400
+
+    try:
+        # Decodifica o token para obter o ID do usuário
+        user_id = serializer.loads(token, salt="password-reset-salt", max_age=3600)
+
+        # Gera o hash da nova senha
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        # Atualiza a senha no banco de dados
+        result = mongo.db.Users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"password_hash": hashed_password}}
+        )
+
+        if result.modified_count == 1:
+            return jsonify({"message": "Senha redefinida com sucesso."}), 200
+        else:
+            return jsonify({"error": "Erro ao redefinir a senha."}), 400
+
+    except SignatureExpired:
+        return jsonify({"error": "O link de recuperação expirou. Solicite um novo e-mail de recuperação."}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Erro ao processar a recuperação de senha: {str(e)}"}), 400
 
 @user_bp.route("/users/worker/register", methods=["POST"])
 def register_worker():
