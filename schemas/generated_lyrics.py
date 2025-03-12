@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from bson import ObjectId as _ObjectId
 from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
-
+from typing import Optional
 
 # Validação de ObjectId
 def check_object_id(value: str) -> str:
@@ -11,14 +11,10 @@ def check_object_id(value: str) -> str:
         raise ValueError("Invalid ObjectId")
     return value
 
-
 ObjectId = Annotated[str, AfterValidator(check_object_id)]
 
-
-class WorkerEventSchema(BaseModel):
-    worker_oid: ObjectId
-    action: str  # "accepted_task", "completed_task"
-    redis_id: str
-    lyrics_id: ObjectId
+class GeneratedLyricsSchema(BaseModel):
+    lyrics: str
+    redis_id: Optional[str]
     user_oid: ObjectId
     timestamp: datetime = datetime.now(timezone.utc)

@@ -170,3 +170,4 @@ cython_debug/
 storage
 storage/clip_id.csv
 nohup.out
+static/lyrics

@@ -107,7 +107,7 @@ def store_audio_file(file, id, max_size=1177*1024):
         return faded_file_path, None
     except Exception as e:
         logger.error(f"Error saving audio file: {e}")
-        return None, "Error processing the audio file."
+        return None, "Erro ao processar arquivo de áudio."
 
 def store_audio_url(url, id, max_size=1177*1024):
     """

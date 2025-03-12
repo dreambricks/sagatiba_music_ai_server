@@ -68,39 +68,43 @@ def moderation_ok(convidado, recado):
         f"###"
     )
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": """
-            Você é um censor de textos de um jornal sobre bebidas alcóolicas e precisa avaliar se os 
-            textos enviados tem algo com conotação negativa, referências políticas, referências religiosas, 
-            palavrões e termos pejorativos. O jornal deve passar sempre uma mensagem divertida e alegre e evitar, 
-            a todo custo, algo que possa deixar alguém triste. 
-            Referências a bebidas alcóolicas são permitidas, desde que não sejam usadas de forma pejorativa.
-            Não pode incentivar o consumo exagerado, compulsivo ou irresponsável de álcool.
-            Não pode sugerir que o consumo de bebidas alcoólicas traz sucesso pessoal, 
-            profissional, esportivo, social ou sexual."""},
-            {"role": "user", "content": prompt}
-        ],
-        response_format={
-            "type": "text"
-        },
-        temperature=0,
-        max_completion_tokens=2048,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": """
+                Você é um censor de textos de um jornal sobre bebidas alcoólicas e precisa avaliar se os 
+                textos enviados têm algo com conotação negativa, referências políticas, referências religiosas, 
+                palavrões e termos pejorativos. O jornal deve passar sempre uma mensagem divertida e alegre e evitar, 
+                a todo custo, algo que possa deixar alguém triste. 
+                Referências a bebidas alcoólicas são permitidas, desde que não sejam usadas de forma pejorativa.
+                Não pode incentivar o consumo exagerado, compulsivo ou irresponsável de álcool.
+                Não pode sugerir que o consumo de bebidas alcoólicas traz sucesso pessoal, 
+                profissional, esportivo, social ou sexual."""},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "text"},
+            temperature=0,
+            max_completion_tokens=2048,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
 
-    logger.info(prompt)
-    logger.info(response)
-    result = response.choices[0].message.content
-    logger.info(result)
+        logger.info(prompt)
+        logger.info(response)
 
-    if result != 'S':
-        return [False, result]
+        result = response.choices[0].message.content
+        logger.info(result)
 
-    return [True, "OK"]
+        if result != 'S':
+            return [False, result]
+
+        return [True, "OK"]
+
+    except Exception as e:
+        logger.error(f"Erro ao validar conteúdo da mensagem: {str(e)}")
+        return [False, "Erro ao validar conteúdo. Por favor, tente novamente."]
 
 
 def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
@@ -147,33 +151,35 @@ def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
         "A letra não pode sugerir que o consumo de bebidas alcoólicas traz sucesso pessoal, profissional, esportivo, social ou sexual."
     )
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Você é um criador de letras de músicas."},
-            {"role": "user", "content": prompt}
-        ],
-        response_format={
-            "type": "text"
-        },
-        max_completion_tokens=2048,
-        temperature=1,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Você é um criador de letras de músicas."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "text"},
+            max_completion_tokens=2048,
+            temperature=1,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
 
-    logger.info(prompt)
-    logger.info(response)
-    lyrics = response.choices[0].message.content
+        logger.info(prompt)
+        logger.info(response)
 
-    if store_location:
-        if not os.path.exists(store_location):
-            os.makedirs(store_location)
-        lyrics_filepath = os.path.join(store_location, generate_filename_with_datetime("lyrics", "txt"))
-        with open(lyrics_filepath, "w", encoding="utf-8") as f:
-            f.write(lyrics)
-            f.write('\n')
+        lyrics = response.choices[0].message.content
+        logger.info(lyrics)
 
-    return lyrics
+        if store_location:
+            os.makedirs(store_location, exist_ok=True)
+            lyrics_filepath = os.path.join(store_location, generate_filename_with_datetime("lyrics", "txt"))
+            with open(lyrics_filepath, "w", encoding="utf-8") as f:
+                f.write(lyrics + '\n')
 
+        return lyrics
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar letra: {str(e)}")
+        return "Erro ao gerar a letra. Por favor, tente novamente."

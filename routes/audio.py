@@ -32,7 +32,7 @@ def save_generated_audio():
     file2 = request.files.get("audio2")
 
     if not user_oid or not id or not file1 or not file2:
-        return jsonify({"error": "user_oid, id, and two audio files are required"}), 400
+        return jsonify({"error": "user_oid, id e dois arquivos de áudio são obrigatórios."}), 400
 
     try:
         # Salvar os arquivos de áudio
@@ -79,12 +79,12 @@ def save_generated_audio():
         # Emitir sinal para notificar que os áudios foram gerados
         socketio.emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
 
-        return jsonify({"message": "Generated audio saved successfully"}), 201
+        return jsonify({"message": "Áudio gerado salvo com sucesso."}), 201
 
     except Exception as e:
         save_system_error("SAVE_AUDIO_FILE", f"id_{id}", "No audio saved for the given id.")
         logger.error(f"[ERROR] Failed to save audio: {str(e)}")
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": f"Falha ao slavar o arquivo {str(e)}"}), 400
 
 @audio_bp.route("/audios/save_url", methods=["POST"])
 def save_generated_audio_from_url():
@@ -98,7 +98,7 @@ def save_generated_audio_from_url():
     audio_url2 = data.get("audio_url2")
 
     if not user_oid or not id or not audio_url1 or not audio_url2:
-        return jsonify({"error": "user_oid, id, and two audio URLs are required"}), 400
+        return jsonify({"error": "user_oid, id e dois arquivos de áudio são obrigatórios."}), 400
 
     try:
         # Baixar e armazenar os áudios das URLs
@@ -145,9 +145,9 @@ def save_generated_audio_from_url():
         # Emitir sinal para notificar que os áudios foram gerados
         socketio.emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
 
-        return jsonify({"message": "Generated audio saved successfully"}), 201
+        return jsonify({"message": "Áudio gerado salvo com sucesso."}), 201
 
     except Exception as e:
         save_system_error("SAVE_AUDIO_URL", f"id_{id}", "No audio saved for the given id.")
         logger.error(f"[ERROR] Failed to save audio from URL: {str(e)}")
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error":f"Falha ao slavar o arquivo {str(e)}"}), 400

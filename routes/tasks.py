@@ -34,7 +34,7 @@ def process_task():
     raw_task = task_db.lpop("lyrics_queue")
 
     if not raw_task:
-        return jsonify({"status": "error", "message": "No tasks available."}), 404
+        return jsonify({"error": "No tasks available."}), 404
 
     task = json.loads(raw_task.decode("utf-8"))
     id = task["id"]
@@ -45,7 +45,7 @@ def process_task():
     # Atualiza a fila no frontend
     emit_queue_list()
 
-    return jsonify({"status": "success", "task": task}), 200
+    return jsonify({"status": f"task: {task}"}), 200
 
 
 @task_bp.route("/tasks/complete", methods=["POST"])
@@ -56,7 +56,7 @@ def task_completed():
     success = data.get("success")
 
     if not id:
-        return jsonify({"status": "error", "message": "Invalid task Id."}), 400
+        return jsonify({"error": "Invalid task Id."}), 400
 
     if success:
         processing_db.delete(id)  # Remove do registro de tarefas em andamento
@@ -65,7 +65,7 @@ def task_completed():
         # Atualiza a fila no frontend
         emit_queue_list()
 
-        return jsonify({"status": "success", "message": "Task completed successfully."}), 200
+        return jsonify({"status": "Task completed successfully."}), 200
     else:
         # Se falhou, recoloca no topo da fila
         raw_task = processing_db.get(id)
@@ -78,9 +78,9 @@ def task_completed():
             # Atualiza a fila no frontend
             emit_queue_list()
 
-            return jsonify({"status": "failed", "message": "Task completion failed. Requeued."}), 200
+            return jsonify({"status": "Task completion failed. Requeued."}), 200
 
-    return jsonify({"status": "error", "message": "Unexpected error."}), 500
+    return jsonify({"error": "Unexpected error."}), 500
 
 
 @task_bp.route("/tasks/requeue", methods=["POST"])
@@ -90,7 +90,7 @@ def requeue_task():
     id = data.get("id")
 
     if not id:
-        return jsonify({"status": "error", "message": "Invalid task Id for requeue."}), 400
+        return jsonify({"error": "Invalid task Id for requeue."}), 400
 
     raw_task = processing_db.get(id)
 
@@ -102,9 +102,9 @@ def requeue_task():
         # Atualiza a fila no frontend
         emit_queue_list()
 
-        return jsonify({"status": "requeued", "message": "Task manually requeued."}), 200
+        return jsonify({"status": "Task manually requeued."}), 200
 
-    return jsonify({"status": "error", "message": "Task not found for requeue."}), 404
+    return jsonify({"error": "Task not found for requeue."}), 404
 
 @task_bp.route("/tasks/fail", methods=["POST"])
 def report_task_failure():
@@ -116,7 +116,7 @@ def report_task_failure():
     user_oid = data.get("user_oid")
 
     if not id or not user_oid:
-        return jsonify({"status": "error", "message": "Both 'id' and 'user_oid' are required."}), 400
+        return jsonify({"error": "Both 'id' and 'user_oid' are required."}), 400
 
     # Tenta remover diretamente sem precisar percorrer toda a fila
     task_db.lrem("lyrics_queue", 0, json.dumps({"id": id}))
@@ -145,4 +145,4 @@ def report_task_failure():
     # Atualizar fila no frontend
     emit_queue_list()
 
-    return jsonify({"status": "failed", "message": f"Failure recorded, {phone} notified."}), 200
+    return jsonify({"error": f"Failure recorded, {phone} notified."}), 200

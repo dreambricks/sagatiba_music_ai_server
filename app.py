@@ -3,6 +3,8 @@ import os
 import uuid
 import redis
 import json
+from bson import ObjectId
+from datetime import datetime, timezone
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -17,6 +19,7 @@ from utils.error_util import save_system_error
 
 from config.mongo_config import mongo, init_mongo
 from config.socket_config import socketio
+from schemas.user_events import UserEventSchema
 
 from routes.user import user_bp
 from routes.audio import audio_bp
@@ -60,13 +63,15 @@ mail = Mail()
 #         MAIL_DEFAULT_SENDER=('Segue na Saga', 'guilhermebegotti@dreambricks.com.br')
 #     )
 # else: 
+
 app.config.update(
-    MAIL_SERVER='smtp-relay.brevo.com',
+    MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
     MAIL_USERNAME=os.getenv('EMAIL_USER'),
     MAIL_PASSWORD= os.getenv('EMAIL_SECRET_KEY'),
-    MAIL_DEFAULT_SENDER=('Segue na Saga', 'guilhermebegotti@dreambricks.com.br')
+    MAIL_DEFAULT_SENDER=('Segue na Saga', 'seguenasaga@gmail.com'),
+    # MAIL_DEBUG=True  # Ativar logs de erro no Flask-Mail
 )
 
 mail.init_app(app)
@@ -138,10 +143,12 @@ def call_generate_lyrics():
     invite_options = request.form.get("invite_options")
     weekdays = request.form.get("weekdays")
     message = request.form.get("message")
+    user_oid = request.form.get("user_oid")
+
     #phone = request.form.get("phone")
 
     logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
-                f"weekdays={weekdays}, message={message}")
+                f"weekdays={weekdays}, message={message}, user_oid={str(ObjectId(user_oid))}")
 
     is_ok, error_msg = moderation_ok(destination, message)
     if is_ok:
@@ -152,7 +159,7 @@ def call_generate_lyrics():
         return jsonify({"lyrics": lyrics})
     else:
         logger.warning("Submitted text violates moderation rules.")
-        return jsonify({"error": error_msg}), 403
+        return jsonify({"error": f"Erro o texto submetido viola as regras de moderação: {error_msg}"}), 403
 
 @app.route("/lyrics/generate", methods=["GET", "POST"])
 def generate_task_id():
@@ -164,7 +171,7 @@ def generate_task_id():
     send_sms_message(message, phone)
     if not lyrics:
         logger.info(f"Task not enqueued for phone: {phone}")
-        return jsonify({"error": "Lyrics parameter is missing"}), 400
+        return jsonify({"error": "A Letra está ausente."}), 400
 
     # Enfileira as letras para processamento posterior
     id = enqueue_task(lyrics, phone)
@@ -176,7 +183,7 @@ def generate_task_id():
     socketio.emit("queue_list", queue_items, namespace="/")
     logger.info(f"Queue updated after enqueue. Total: {len(queue_items)} items.")
 
-    return jsonify({"status": "Your task has been enqueued", "task_id": id}), 202
+    return jsonify({"status": "Sua tarefa foi enfileirada", "task_id": id}), 202
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
@@ -185,14 +192,14 @@ def get_lyrics_and_audio():
     host_url = os.getenv("HOST_URL")
 
     if not id:
-        return jsonify({"error": "Id is required"}), 400
+        return jsonify({"error": "O Id é obrigatório."}), 400
 
     try:
         # Busca a música no MongoDB usando o campo `redis_id`
         audio_entry = mongo.db.GeneratedAudios.find_one({"redis_id": id})
 
         if not audio_entry:
-            return jsonify({"error": "Lyrics and audio not found for the given Id"}), 404
+            return jsonify({"error": "Letras e áudio não encontrados para o ID fornecido."}), 404
 
         # Obtém letras e caminhos dos áudios
         lyrics = audio_entry.get("lyrics", "No lyrics found")
@@ -208,7 +215,7 @@ def get_lyrics_and_audio():
     except Exception as e:
         logger.error(f"Error retrieving lyrics and audio: {e}")
         save_system_error("GET_LYRICS_AUDIO", f"id_{id}", "No audio and no lyrics found for the given id.")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": f"Erro ao recuperar letras e áudio: {e}"}), 500
 
 @socketio.on("get_queue")
 def send_queue():
@@ -229,12 +236,12 @@ def request_audio(json):
     # Validação dos parâmetros obrigatórios
     if not id:
         logger.warning("[SOCKET] Request without Task Id")
-        emit('error_message', {'error': 'Task Id is required', 'code': 400}, namespace='/')
+        emit('error_message', {'error': 'Task Id é obrigatório', 'code': 400}, namespace='/')
         return
 
     if not phone:
         logger.warning("[SOCKET] Request without phone number")
-        emit('error_message', {'error': 'Phone number is required', 'code': 400}, namespace='/')
+        emit('error_message', {'error': 'Telefone é obrigatório', 'code': 400}, namespace='/')
         return
 
     # Busca no banco de dados `GeneratedAudios` pelo `redis_id`
@@ -243,7 +250,7 @@ def request_audio(json):
     if not audio_entry:
         logger.warning(f"[SOCKET] No audio found for id={id}")
         save_system_error("REQUEST_AUDIO", f"id_{id}", "No audio found for the given id.")
-        emit('error_message', {'error': 'No audio found for the given id', 'code': 404}, namespace='/')
+        emit('error_message', {'error': "Nenhum áudio encontrado para o ID fornecido.", 'code': 404}, namespace='/')
         return
 
     # Obtém os caminhos dos arquivos de áudio armazenados

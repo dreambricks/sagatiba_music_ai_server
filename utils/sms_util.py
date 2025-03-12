@@ -41,6 +41,7 @@ def send_sms_message(message, destination_number):
 
     except Exception as e:
         logger.error(f"Error sending message to {destination_number}: {str(e)}")
+        return f"Error ao enviar a mensagem para {destination_number}: {str(e)}"
 
 
 def send_sms_download_message(message_url, destination_number):
@@ -66,4 +67,4 @@ def format_to_e164(phone_number, country_code='BR'):
 
         return phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
     except NumberParseException as e:
-        raise ValueError(f"Error while processing the phone number {phone_number}: {e}")
+        raise ValueError(f"Erro ao processar o número de telefone {phone_number}: {e}")

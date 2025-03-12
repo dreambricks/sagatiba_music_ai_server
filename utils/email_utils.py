@@ -1,3 +1,4 @@
+from flask import render_template
 from flask_mail import Message
 
 def send_verification_email(email, verification_link):
@@ -6,16 +7,10 @@ def send_verification_email(email, verification_link):
 
     msg = Message(
         subject="Confirme seu e-mail",
-        sender="guilhermebegotti@dreambricks.com.br",
+        sender="seguenasaga@gmail.com",
         recipients=[email]
     )
-    msg.body = f"Por favor, clique no link para confirmar seu e-mail: {verification_link}"
-    msg.html = f"""
-        <p>Olá,</p>
-        <p>Para ativar sua conta, clique no link abaixo:</p>
-        <p><a href="{verification_link}">Confirmar e-mail</a></p>
-        <p>Se você não solicitou este cadastro, ignore esta mensagem.</p>
-    """
+    msg.html = render_template("email_verification.html", verification_link=verification_link)
     mail.send(msg)
 
 def send_reset_email(email, reset_link):
@@ -24,14 +19,8 @@ def send_reset_email(email, reset_link):
 
     msg = Message(
         subject="Redefinição de Senha - Segue na Saga",
-        sender="guilhermebegotti@dreambricks.com.br",
+        sender="seguenasaga@gmail.com",
         recipients=[email]
     )
-    msg.body = f"Para redefinir sua senha, clique no link: {reset_link}"
-    msg.html = f"""
-        <p>Olá,</p>
-        <p>Para redefinir sua senha, clique no link abaixo:</p>
-        <p><a href="{reset_link}">Redefinir Senha</a></p>
-        <p>Se você não solicitou esta alteração, ignore esta mensagem.</p>
-    """
+    msg.html = render_template("email_reset_password.html", reset_link=reset_link)
     mail.send(msg)

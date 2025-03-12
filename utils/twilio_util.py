@@ -32,6 +32,8 @@ def send_whatsapp_message(message, destination_number):
         logging.info(f"Message has been sent to {formatted_number}")
     except Exception as e:
         logging.error(f"Error when sending message to {destination_number}: {str(e)}")
+        return f"Error ao enviar a mensagem para {destination_number}: {str(e)}"
+
 
 def send_whatsapp_download_message(message_url, destination_number):
     """Envia a mensagem do WhatsApp com o link para acessar as músicas."""
@@ -59,5 +61,5 @@ def format_to_e164(phone_number, country_code='BR'):
         
         return phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
     except NumberParseException as e:
-        raise ValueError(f"Error parsing phone number: {e}")
+        raise ValueError(f"Erro ao processar o número de telefone {phone_number}: {e}")
 

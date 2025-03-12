@@ -58,7 +58,14 @@ def register_user():
 
         # Envia o e-mail de verificação
         verification_link = url_for('user_bp.verify_email', token=token, _external=True)
-        send_verification_email(email, verification_link)
+        
+        try:
+            send_verification_email(email, verification_link)
+        except Exception as email_error:
+            # Se houver erro no envio, remove o usuário do banco de dados
+            mongo.db.Users.delete_one({"_id": user_id})
+            return jsonify({"error": f"Erro ao enviar o e-mail de verificação: {str(email_error)}. Cadastro cancelado."}), 400
+
 
         return jsonify({"message": "Usuário registrado com sucesso."}), 201
     except Exception as e:
