@@ -14,6 +14,7 @@ from flask_limiter.util import get_remote_address
 from flask_mail import Mail
 
 from utils.openai_util import moderation_ok, generate_lyrics
+from utils.sms_util import send_sms_download_message, send_sms_message
 from utils.error_util import save_system_error
 
 from config.mongo_config import mongo, init_mongo
@@ -167,6 +168,14 @@ def generate_task_id():
     """Enfileira a geração de música para as letras fornecidas."""
     data = request.get_json()
     lyrics_oid = data.get("lyrics_oid")
+    phone = data.get("phone")
+    message = "Oi Sagalover! Sua música está sendo preparada."
+    send_sms_message(message, phone)
+
+    if not lyrics:
+        logger.info(f"Task not enqueued for phone: {phone}")
+        return jsonify({"error": "A Letra está ausente."}), 400
+
 
     if not lyrics_oid:
         logger.info(f"Task not enqueued: lyrics_oid missing")
@@ -188,7 +197,7 @@ def generate_task_id():
             return jsonify({"error": "A Letra está ausente ou vazia."}), 400
 
         # Enfileira as letras para processamento posterior
-        task_id = enqueue_task(lyrics, lyrics_oid)
+        task_id = enqueue_task(lyrics, lyrics_oid, phone)
         logger.info(f"Task {task_id} enqueued for lyrics_id: {lyrics_oid}")
 
         # Atualiza a fila no frontend via socket
@@ -271,12 +280,18 @@ def request_audio(json):
     logger.info(f"[SOCKET] Request received: {json}")
 
     id = json.get('task_id')
+    phone = json.get('phone')
     host_url = os.getenv("HOST_URL")
 
     # Validação dos parâmetros obrigatórios
     if not id:
         logger.warning("[SOCKET] Request without Task Id")
         emit('error_message', {'error': 'Task Id é obrigatório', 'code': 400}, namespace='/')
+        return
+
+    if not phone:
+        logger.warning("[SOCKET] Request without phone number")
+        emit('error_message', {'error': 'Telefone é obrigatório', 'code': 400}, namespace='/')
         return
 
     # Busca no banco de dados `GeneratedAudios` pelo `redis_id`
@@ -294,6 +309,10 @@ def request_audio(json):
 
     logger.info(f"[SOCKET] Audio files stored: {file_paths}")
 
+    # Envia mensagem via WhatsApp
+    message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={id}"
+    send_sms_download_message(message_url, phone)
+
     # Responde ao WebSocket com os áudios encontrados
     emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
 
@@ -302,13 +321,14 @@ app.register_blueprint(user_bp, url_prefix="/api")
 app.register_blueprint(audio_bp, url_prefix="/api")
 app.register_blueprint(task_bp, url_prefix="/api")
 
-def enqueue_task(lyrics, lyrics_oid):
+def enqueue_task(lyrics, lyrics_oid, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando um ID, a letra e o telefone do usuário """
     id = str(uuid.uuid4())  # Gera um UUID único para cada tarefa
     task_data = json.dumps({
         "id": id,
         "lyrics": lyrics,
-        "lyrics_oid": lyrics_oid
+        "lyrics_oid": lyrics_oid,
+        "phone": phone
     })
 
     try:

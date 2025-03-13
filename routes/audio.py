@@ -9,6 +9,7 @@ import utils.db_util as db_util
 from flask_socketio import emit
 from config.socket_config import socketio
 from utils.error_util import save_system_error
+from utils.sms_util import send_sms_download_message
 from bson import ObjectId
 
 logging.basicConfig(
@@ -26,6 +27,7 @@ def save_generated_audio():
     id = request.form.get("id")
     worker_oid = request.form.get("worker_oid")
     lyrics_oid = request.form.get("lyrics_oid")
+    phone = request.form.get("phone")
     file1 = request.files.get("audio1")
     file2 = request.files.get("audio2")
 
@@ -46,6 +48,10 @@ def save_generated_audio():
 
         # Log das URLs armazenadas
         logger.info(f"[AUDIO] Audio files stored: {local_audio_urls}")
+
+        # Envia mensagem via SMS com o link para acesso
+        message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={id}"
+        send_sms_download_message(message_url, phone)
 
         lyrics_entry = mongo.db.GeneratedLyrics.find_one({"_id": ObjectId(lyrics_oid)})
         
@@ -94,6 +100,7 @@ def save_generated_audio_from_url():
     """Baixa arquivos de áudio de URLs, salva no servidor e registra a atividade do usuário."""
     data = request.json
     id = data.get("id")
+    phone = data.get("id")
     worker_oid = data.get("worker_oid")
     lyrics_oid = data.get("lyrics_oid")
     audio_url1 = data.get("audio_url1")
@@ -116,6 +123,10 @@ def save_generated_audio_from_url():
 
         # Log das URLs armazenadas
         logger.info(f"[AUDIO] Audio files stored: {local_audio_urls}")
+
+        # Envia mensagem via SMS com o link para acesso
+        message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={id}"
+        send_sms_download_message(message_url, phone)
 
         lyrics_entry = mongo.db.GeneratedLyrics.find_one({"_id": ObjectId(lyrics_oid)})
         

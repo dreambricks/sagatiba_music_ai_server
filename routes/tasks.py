@@ -7,6 +7,7 @@ from config.mongo_config import mongo
 from flask_socketio import emit
 from utils.error_util import save_system_error
 from config.socket_config import socketio
+from utils.twilio_util import send_whatsapp_message
 
 task_bp = Blueprint("task_bp", __name__)
 
@@ -109,6 +110,7 @@ def report_task_failure():
     """Registra a falha na geração de música, remove a tarefa da fila e envia uma mensagem de erro ao cliente."""
     data = request.json
     id = data.get("id")
+    phone = data.get("phone")
     lyrics_oid = data.get("lyrics_oid")
     worker_oid = data.get("worker_oid")
 
@@ -134,7 +136,11 @@ def report_task_failure():
     # Salvar erro no Redis (para status do sistema)
     save_system_error("TASK_GENERATION_FAILED", f"task_id_{id}", f"Task {id} failed during music generation. User {worker_oid} could not complete the task")
 
+    # Enviar mensagem de erro ao usuário
+    error_message = "Oi! Infelizmente houve um problema na geração da sua música. Por favor, tente novamente."
+    send_whatsapp_message(error_message, phone)
+
     # Atualizar fila no frontend
     emit_queue_list()
 
-    return jsonify({"error": f"Failure recorded."}), 200
+    return jsonify({"error": f"Failure recorded, {phone} notified."}), 200
