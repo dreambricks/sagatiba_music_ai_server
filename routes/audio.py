@@ -77,7 +77,7 @@ def save_generated_audio():
             "timestamp": datetime.now(timezone.utc)
         }
         event = WorkerEventSchema(**event_data)
-        mongo.db.UsersEvents.insert_one(event.model_dump())
+        mongo.db.WorkersEvents.insert_one(event.model_dump())
 
         # Emitir sinal para notificar que os áudios foram gerados
         socketio.emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
@@ -147,7 +147,7 @@ def save_generated_audio_from_url():
             "timestamp": datetime.now(timezone.utc)
         }
         event = WorkerEventSchema(**event_data)
-        mongo.db.UsersEvents.insert_one(event.model_dump())
+        mongo.db.WorkersEvents.insert_one(event.model_dump())
 
         # Emitir sinal para notificar que os áudios foram gerados
         socketio.emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
