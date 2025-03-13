@@ -4,6 +4,9 @@ import openai
 from dotenv import load_dotenv, find_dotenv
 from utils.db_util import load_file_into_set, remove_accent, generate_filename_with_datetime
 import parameters as param
+from schemas.generated_lyrics import GeneratedLyricsSchema 
+from config.mongo_config import mongo
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +110,7 @@ def moderation_ok(convidado, recado):
         return [False, "Erro ao validar conteúdo. Por favor, tente novamente."]
 
 
-def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
+def generate_lyrics(convidado, opcao, dia_semana, recado, user_oid, store_location=None):
     logger.info(opcao)
 
     if opcao == "BAR":
@@ -169,17 +172,30 @@ def generate_lyrics(convidado, opcao, dia_semana, recado, store_location=None):
         logger.info(prompt)
         logger.info(response)
 
-        lyrics = response.choices[0].message.content
+        lyrics = response.choices[0].message.content.strip()
         logger.info(lyrics)
 
+        # Salvar a letra gerada no banco de dados
+        lyrics_data = {
+            "lyrics": lyrics,
+            "user_oid": user_oid,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        lyrics_entry = GeneratedLyricsSchema(**lyrics_data)
+        result = mongo.db.GeneratedLyrics.insert_one(lyrics_entry.model_dump())
+
+        # ID do documento salvo
+        saved_id = str(result.inserted_id)
+
+        # Salvar a letra gerada em um arquivo local
         if store_location:
             os.makedirs(store_location, exist_ok=True)
             lyrics_filepath = os.path.join(store_location, generate_filename_with_datetime("lyrics", "txt"))
             with open(lyrics_filepath, "w", encoding="utf-8") as f:
                 f.write(lyrics + '\n')
 
-        return lyrics
+        return lyrics, saved_id  # Retorna a letra e o ID do documento salvo
 
     except Exception as e:
         logger.error(f"Erro ao gerar letra: {str(e)}")
-        return "Erro ao gerar a letra. Por favor, tente novamente."
+        return "Erro ao gerar a letra. Por favor, tente novamente.", None

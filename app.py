@@ -14,7 +14,6 @@ from flask_limiter.util import get_remote_address
 from flask_mail import Mail
 
 from utils.openai_util import moderation_ok, generate_lyrics
-from utils.sms_util import send_sms_download_message, send_sms_message
 from utils.error_util import save_system_error
 
 from config.mongo_config import mongo, init_mongo
@@ -149,41 +148,61 @@ def call_generate_lyrics():
 
     logger.info(f"Received form data: destination={destination}, invite_options={invite_options}, "
                 f"weekdays={weekdays}, message={message}, user_oid={str(ObjectId(user_oid))}")
-
+    
     is_ok, error_msg = moderation_ok(destination, message)
     if is_ok:
         lyrics_path = "static/lyrics"
-        lyrics = generate_lyrics(destination, invite_options, weekdays, message, lyrics_path)
+        lyrics, lyrics_oid = generate_lyrics(destination, invite_options, weekdays, message, user_oid, lyrics_path)
+        register_user_event(user_oid, "lyrics_processing", lyrics_oid)
+
         logger.info("Lyrics generated successfully.")
         #return redirect(url_for('display_lyrics', lyrics=lyrics, phonw=phonw))
-        return jsonify({"lyrics": lyrics})
+        return jsonify({"lyrics": lyrics, "lyrics_oid": lyrics_oid})
     else:
         logger.warning("Submitted text violates moderation rules.")
         return jsonify({"error": f"Erro o texto submetido viola as regras de moderação: {error_msg}"}), 403
 
-@app.route("/lyrics/generate", methods=["GET", "POST"])
+@app.route("/lyrics/generate", methods=["POST"])
 def generate_task_id():
     """Enfileira a geração de música para as letras fornecidas."""
     data = request.get_json()
-    lyrics = data.get("lyrics")
-    phone = data.get("phone")
-    message = "Oi Sagalover! Sua música está sendo preparada."
-    send_sms_message(message, phone)
-    if not lyrics:
-        logger.info(f"Task not enqueued for phone: {phone}")
-        return jsonify({"error": "A Letra está ausente."}), 400
+    lyrics_oid = data.get("lyrics_oid")
 
-    # Enfileira as letras para processamento posterior
-    id = enqueue_task(lyrics, phone)
-    logger.info(f"Task {id} enqueued for phone: {phone}")
+    if not lyrics_oid:
+        logger.info(f"Task not enqueued: lyrics_oid missing")
+        return jsonify({"error": "O Id da Letra é obrigatório."}), 400
 
-    # Chama o socket para atualizar a fila no frontend
-    queue_items = task_db.lrange("lyrics_queue", 0, -1)
-    queue_items = [json.loads(task.decode("utf-8")) for task in queue_items]
-    socketio.emit("queue_list", queue_items, namespace="/")
-    logger.info(f"Queue updated after enqueue. Total: {len(queue_items)} items.")
+    try:
+        # Buscar a letra no banco de dados pelo ObjectId
+        lyrics_entry = mongo.db.GeneratedLyrics.find_one({"_id": ObjectId(lyrics_oid)})
+        
+        if not lyrics_entry:
+            logger.info(f"Task not enqueued: Lyrics not found for id {lyrics_oid}")
+            return jsonify({"error": "Nenhuma letra encontrada para o Id fornecido."}), 404
 
-    return jsonify({"status": "Sua tarefa foi enfileirada", "task_id": id}), 202
+        # Pega a letra do documento retornado
+        lyrics = lyrics_entry.get("lyrics", "")
+
+        if not lyrics:
+            logger.info(f"Task not enqueued: Letra vazia para id {lyrics_oid}")
+            return jsonify({"error": "A Letra está ausente ou vazia."}), 400
+
+        # Enfileira as letras para processamento posterior
+        task_id = enqueue_task(lyrics, lyrics_oid)
+        logger.info(f"Task {task_id} enqueued for lyrics_id: {lyrics_oid}")
+
+        # Atualiza a fila no frontend via socket
+        queue_items = task_db.lrange("lyrics_queue", 0, -1)
+        queue_items = [json.loads(task.decode("utf-8")) for task in queue_items]
+        socketio.emit("queue_list", queue_items, namespace="/")
+        logger.info(f"Queue updated after enqueue. Total: {len(queue_items)} items.")
+
+        return jsonify({"status": "Sua tarefa foi enfileirada", "task_id": task_id}), 202
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar letra ou enfileirar tarefa: {str(e)}")
+        return jsonify({"error": "Erro interno ao processar a requisição."}), 500
+
 
 @app.route("/lyrics/get", methods=["GET"])
 def get_lyrics_and_audio():
@@ -195,21 +214,43 @@ def get_lyrics_and_audio():
         return jsonify({"error": "O Id é obrigatório."}), 400
 
     try:
-        # Busca a música no MongoDB usando o campo `redis_id`
-        audio_entry = mongo.db.GeneratedAudios.find_one({"redis_id": id})
+        # Busca a música no MongoDB usando o campo `redis_id` para buscar os dados de áudio e a letra correspondente
+        pipeline = [
+            {"$match": {"redis_id": id}},  
+            {
+                "$lookup": {
+                    "from": "GeneratedLyrics",  
+                    "localField": "lyrics_oid",  
+                    "foreignField": "_id", 
+                    "as": "lyrics_data",  
+                }
+            },
+            {"$unwind": "$lyrics_data"},
+            {
+                "$project": {
+                    "_id": 0,  
+                    "redis_id": 1,
+                    "lyrics": "$lyrics_data.lyrics",  
+                    "audio_urls": 1,  
+                }
+            }
+        ]
 
-        if not audio_entry:
+        result = list(mongo.db.GeneratedAudios.aggregate(pipeline))
+
+        # Se não houver resultado, retorna erro
+        if not result:
             return jsonify({"error": "Letras e áudio não encontrados para o ID fornecido."}), 404
 
-        # Obtém letras e caminhos dos áudios
-        lyrics = audio_entry.get("lyrics", "No lyrics found")
-        audio_files = [
-            f"{host_url}/{file}" for file in audio_entry.get("audio_urls", [])
-        ]
+        audio_entry = result[0]
+
+        # Obtém os URLs dos áudios
+        host_url = request.host_url.rstrip("/")  # Garante que a URL base esteja correta
+        audio_files = [f"{host_url}/{file}" for file in audio_entry.get("audio_urls", [])]
 
         return jsonify({
             "audio_urls": audio_files,
-            "lyrics": lyrics
+            "lyrics": audio_entry["lyrics"],
         }), 200
 
     except Exception as e:
@@ -230,18 +271,12 @@ def request_audio(json):
     logger.info(f"[SOCKET] Request received: {json}")
 
     id = json.get('task_id')
-    phone = json.get('phone')
     host_url = os.getenv("HOST_URL")
 
     # Validação dos parâmetros obrigatórios
     if not id:
         logger.warning("[SOCKET] Request without Task Id")
         emit('error_message', {'error': 'Task Id é obrigatório', 'code': 400}, namespace='/')
-        return
-
-    if not phone:
-        logger.warning("[SOCKET] Request without phone number")
-        emit('error_message', {'error': 'Telefone é obrigatório', 'code': 400}, namespace='/')
         return
 
     # Busca no banco de dados `GeneratedAudios` pelo `redis_id`
@@ -259,10 +294,6 @@ def request_audio(json):
 
     logger.info(f"[SOCKET] Audio files stored: {file_paths}")
 
-    # Envia mensagem via WhatsApp
-    message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={id}"
-    send_sms_download_message(message_url, phone)
-
     # Responde ao WebSocket com os áudios encontrados
     emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
 
@@ -271,22 +302,70 @@ app.register_blueprint(user_bp, url_prefix="/api")
 app.register_blueprint(audio_bp, url_prefix="/api")
 app.register_blueprint(task_bp, url_prefix="/api")
 
-def enqueue_task(lyrics, phone):
+def enqueue_task(lyrics, lyrics_oid):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando um ID, a letra e o telefone do usuário """
     id = str(uuid.uuid4())  # Gera um UUID único para cada tarefa
     task_data = json.dumps({
         "id": id,
         "lyrics": lyrics,
-        "phone": phone
+        "lyrics_oid": lyrics_oid
     })
 
-    logger.info(f"Enqueuing task: {task_data}")
-    task_db.rpush('lyrics_queue', task_data)
+    try:
+        # Atualiza o campo `redis_id` na coleção `GeneratedLyrics`
+        result = mongo.db.GeneratedLyrics.update_one(
+            {"_id": ObjectId(lyrics_oid)},  # Filtra pelo OID da letra
+            {"$set": {"redis_id": id}}  # Atualiza o campo redis_id
+        )
+
+        if result.matched_count == 0:
+            logger.warning(f"Nenhuma letra encontrada para lyrics_oid: {lyrics_oid}")
+        elif result.modified_count == 1:
+            logger.info(f"redis_id atualizado para {id} na letra {lyrics_oid}")
+
+        logger.info(f"Enqueuing task: {task_data}")
+        task_db.rpush('lyrics_queue', task_data)
+        return id
+
+    except Exception as e:
+        logger.error(f"Erro ao atualizar redis_id no MongoDB: {str(e)}")
+
     return id
     
 def dequeue_task():
     """ Remove e retorna a primeira tarefa da fila FIFO no Redis """
     return task_db.lpop('lyrics_queue')
+
+def register_user_event(user_oid, action, lyrics_oid, audio_oid=None):
+    """
+    Registra um evento na coleção UsersEvents.
+
+    :param user_oid: ID do usuário (ObjectId)
+    :param action: Texto de identificação da tarefa
+    :param lyrics_oid: ID da Letra associada (ObjectId)
+    :param audio_oid: (Opcional) ID do áudio associado (ObjectId)
+    """
+    try:
+        # Criando o dicionário de evento
+        event_data = {
+            "user_oid": user_oid,
+            "action": action,
+            "lyrics_oid": lyrics_oid,
+            "timestamp": datetime.now(timezone.utc)
+        }
+
+        # Adiciona o audio_oid apenas se não for None
+        if audio_oid is not None:
+            event_data["audio_oid"] = audio_oid
+
+        # Criando o evento e salvando no MongoDB
+        event = UserEventSchema(**event_data)
+        mongo.db.UsersEvents.insert_one(event.model_dump())
+
+        return True  # Retorna sucesso
+    except Exception as e:
+        logger.error(f"Erro ao registrar evento do usuário: {str(e)}")
+        return False  # Retorna falha
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")

@@ -2,13 +2,11 @@ from flask import Blueprint, request, jsonify
 import json
 import logging
 import redis
-from bson import ObjectId
 from datetime import datetime, timezone
 from config.mongo_config import mongo
 from flask_socketio import emit
 from utils.error_util import save_system_error
 from config.socket_config import socketio
-from utils.twilio_util import send_whatsapp_message
 
 task_bp = Blueprint("task_bp", __name__)
 
@@ -111,12 +109,11 @@ def report_task_failure():
     """Registra a falha na geração de música, remove a tarefa da fila e envia uma mensagem de erro ao cliente."""
     data = request.json
     id = data.get("id")
-    phone = data.get("phone")
-    lyrics = data.get("lyrics")
-    user_oid = data.get("user_oid")
+    lyrics_oid = data.get("lyrics_oid")
+    worker_oid = data.get("worker_oid")
 
-    if not id or not user_oid:
-        return jsonify({"error": "Both 'id' and 'user_oid' are required."}), 400
+    if not id or not worker_oid:
+        return jsonify({"error": "Both 'id' and 'worker_oid' are required."}), 400
 
     # Tenta remover diretamente sem precisar percorrer toda a fila
     task_db.lrem("lyrics_queue", 0, json.dumps({"id": id}))
@@ -126,23 +123,18 @@ def report_task_failure():
 
     # Registrar evento de falha no MongoDB (UsersEvents)
     event_data = {
-        "user_oid": ObjectId(user_oid),
+        "worker_oid": worker_oid,
         "action": "music_generation_failed",
         "redis_id": id,
-        "phone": phone,
-        "lyrics": lyrics,
+        "lyrics_oid": lyrics_oid,
         "timestamp": datetime.now(timezone.utc)
     }
     mongo.db.UsersEvents.insert_one(event_data)
 
     # Salvar erro no Redis (para status do sistema)
-    save_system_error("TASK_GENERATION_FAILED", f"task_id_{id}", f"Task {id} failed during music generation. User {user_oid} could not complete the task")
-
-    # Enviar mensagem de erro ao usuário
-    error_message = "Oi! Infelizmente houve um problema na geração da sua música. Por favor, tente novamente."
-    send_whatsapp_message(error_message, phone)
+    save_system_error("TASK_GENERATION_FAILED", f"task_id_{id}", f"Task {id} failed during music generation. User {worker_oid} could not complete the task")
 
     # Atualizar fila no frontend
     emit_queue_list()
 
-    return jsonify({"error": f"Failure recorded, {phone} notified."}), 200
+    return jsonify({"error": f"Failure recorded."}), 200

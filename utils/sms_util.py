@@ -3,7 +3,6 @@ import requests
 import logging
 import phonenumbers
 from phonenumbers import NumberParseException
-from dotenv import load_dotenv
 
 logging.basicConfig(
     level=logging.DEBUG,

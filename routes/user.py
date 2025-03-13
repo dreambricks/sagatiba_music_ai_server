@@ -107,7 +107,11 @@ def login_user():
         return jsonify({"error": "Email e senha são necessários para o login"}), 400
 
     # Buscar usuário no banco de dados
-    user = mongo.db.Users.find_one({"email": email, "validated": True})
+    user = mongo.db.Users.find_one({"email": email})
+
+    # Verificar se o usuário está validado
+    if not user.get("validated", False):  # Se "validated" for False ou não existir, retorna erro
+        return jsonify({"error": "Usuário não validado. Por favor verifique seu email."}), 403
     
     if not user:
         return jsonify({"error": "Email ou senha inválidos"}), 401
@@ -210,6 +214,11 @@ def login_worker():
     
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
+    
+    # Verificar se o usuário está validado
+    if not user.get("validated", False):  # Se "validated" for False ou não existir, retorna erro
+        return jsonify({"error": "User account is not validated. Please verify your email."}), 403
+
 
     # Comparar a senha fornecida com o hash armazenado
     if not bcrypt.checkpw(password.encode('utf-8'), user["password_hash"].encode('utf-8')):
