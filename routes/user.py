@@ -71,6 +71,42 @@ def register_user():
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar o usuário: {str(e)}"}), 400
 
+@user_bp.route("/users/resend-verification", methods=["POST"])
+def resend_verification_email():
+    """Reenvia o e-mail de verificação para usuários não validados."""
+    data = request.json
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "E-mail é obrigatório."}), 400
+
+    # Buscar o usuário pelo e-mail
+    user = mongo.db.Users.find_one({"email": email})
+
+    if not user:
+        return jsonify({"error": "Usuário não encontrado."}), 404
+
+    if user.get("validated", False):
+        return jsonify({"message": "Usuário já está validado."}), 200
+
+    try:
+        # Gera um novo token de validação
+        user_id = str(user["_id"])
+        token = serializer.dumps(user_id, salt='email-confirm-salt')
+
+        # Gera o link de verificação
+        verification_link = url_for('user_bp.verify_email', token=token, _external=True)
+
+        # Reenvia o e-mail de verificação
+        try:
+            send_verification_email(email, verification_link)
+        except Exception as email_error:
+            return jsonify({"error": f"Erro ao enviar o e-mail de verificação: {str(email_error)}"}), 500
+
+        return jsonify({"message": "E-mail de verificação reenviado com sucesso."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Erro ao processar a solicitação: {str(e)}"}), 500
 
 @user_bp.route("/users/verify_email/<token>", methods=["GET"])
 def verify_email(token):
