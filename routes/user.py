@@ -71,7 +71,7 @@ def register_user():
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar o usuário: {str(e)}"}), 400
 
-@user_bp.route("/users/resend-verification", methods=["POST"])
+@user_bp.route("/users/resend_verification", methods=["POST"])
 def resend_verification_email():
     """Reenvia o e-mail de verificação para usuários não validados."""
     data = request.json
