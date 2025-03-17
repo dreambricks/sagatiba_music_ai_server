@@ -122,7 +122,7 @@ def verify_email(token):
         )
 
         if result.modified_count == 1:
-            return redirect("https://seguenasaga.sagatiba.com/", code=302)
+            return redirect("/users/login", code=302)
         else:
             return jsonify({"error": "Usuário não encontrado ou já validado."}), 400
 
@@ -184,7 +184,7 @@ def forgot_password():
     token = serializer.dumps(str(user["_id"]), salt="password-reset-salt")
 
     # Envia o e-mail de recuperação
-    reset_link = url_for('user_bp.reset_password', token=token, _external=True)
+    reset_link = url_for('/users/reset_password', token=token, _external=True)
     send_reset_email(email, reset_link)
 
     return jsonify({"message": "E-mail de recuperação de senha enviado com sucesso."}), 200
@@ -251,11 +251,6 @@ def login_worker():
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
     
-    # Verificar se o usuário está validado
-    if not user.get("validated", False):  # Se "validated" for False ou não existir, retorna erro
-        return jsonify({"error": "User account is not validated. Please verify your email."}), 403
-
-
     # Comparar a senha fornecida com o hash armazenado
     if not bcrypt.checkpw(password.encode('utf-8'), user["password_hash"].encode('utf-8')):
         return jsonify({"error": "Invalid email or password"}), 401

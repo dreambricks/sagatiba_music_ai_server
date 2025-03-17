@@ -172,7 +172,7 @@ def generate_task_id():
     message = "Oi Sagalover! Sua música está sendo preparada."
     send_sms_message(message, phone)
 
-    if not lyrics:
+    if not phone:
         logger.info(f"Task not enqueued for phone: {phone}")
         return jsonify({"error": "A Letra está ausente."}), 400
 
