@@ -145,13 +145,13 @@ def login_user():
     # Buscar usuário no banco de dados
     user = mongo.db.Users.find_one({"email": email})
 
+    if not user:
+        return jsonify({"error": f"Usuário não encontrado para o email {email}. Faça o cadastro na nossa plataforma."}), 401
+    
     # Verificar se o usuário está validado
     if not user.get("validated", False):  # Se "validated" for False ou não existir, retorna erro
         return jsonify({"error": "Usuário não validado. Por favor verifique seu email."}), 403
     
-    if not user:
-        return jsonify({"error": "Email ou senha inválidos"}), 401
-
     # Comparar a senha fornecida com o hash armazenado
     if not bcrypt.checkpw(password.encode('utf-8'), user["password_hash"].encode('utf-8')):
         return jsonify({"error": "Email ou senha inválidos"}), 401
