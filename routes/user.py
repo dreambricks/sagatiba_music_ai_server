@@ -184,7 +184,7 @@ def forgot_password():
     token = serializer.dumps(str(user["_id"]), salt="password-reset-salt")
 
     # Envia o e-mail de recuperação
-    reset_link = url_for('/users/reset_password', token=token, _external=True)
+    reset_link = url_for('user_bp.reset_password', token=token, _external=True)
     send_reset_email(email, reset_link)
 
     return jsonify({"message": "E-mail de recuperação de senha enviado com sucesso."}), 200
