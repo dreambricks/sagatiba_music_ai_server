@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 # Chave secreta para gerar JWT
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
+FRONT_URL = os.getenv("FRONT_URL")
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -184,7 +185,7 @@ def forgot_password():
     token = serializer.dumps(str(user["_id"]), salt="password-reset-salt")
 
     # Envia o e-mail de recuperação
-    reset_link = url_for('user_bp.reset_password', token=token, _external=True)
+    reset_link = f"{FRONT_URL}/reset_password/{token}"
     send_reset_email(email, reset_link)
 
     return jsonify({"message": "E-mail de recuperação de senha enviado com sucesso."}), 200
