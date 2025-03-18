@@ -44,7 +44,7 @@ def process_task():
     # Atualiza a fila no frontend
     emit_queue_list()
 
-    return jsonify({"status": f"task: {task}"}), 200
+    return jsonify({"status": "sucess", "task": task}), 200
 
 
 @task_bp.route("/tasks/complete", methods=["POST"])
