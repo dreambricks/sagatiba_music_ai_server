@@ -123,7 +123,7 @@ def verify_email(token):
         )
 
         if result.modified_count == 1:
-            return redirect("/users/login", code=302)
+            return redirect(f"{FRONT_URL}/login", code=302)
         else:
             return jsonify({"error": "Usuário não encontrado ou já validado."}), 400
 
