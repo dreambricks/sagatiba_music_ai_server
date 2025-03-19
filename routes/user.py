@@ -125,13 +125,13 @@ def verify_email(token):
         if result.modified_count == 1:
             return redirect(f"{FRONT_URL}/login", code=302)
         else:
-            return jsonify({"error": "Usuário não encontrado ou já validado."}), 400
+            return redirect(f"{FRONT_URL}/erro/Usuário não encontrado ou já validado.", code=303)
 
     except SignatureExpired:
-        return jsonify({"error": "O link de verificação expirou. Solicite um novo e-mail de validação."}), 400
+        return redirect(f"{FRONT_URL}/erro/O link de verificação expirou. Solicite um novo e-mail de validação.", code=303)
 
     except BadSignature:
-        return jsonify({"error": "O link de verificação é inválido."}), 400
+        return redirect(f"{FRONT_URL}/erro/O link de verificação é inválido.", code=303)
 
 @user_bp.route("/users/login", methods=["POST"])
 def login_user():
