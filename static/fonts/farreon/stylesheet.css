@@ -1,0 +1,120 @@
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-DemiBold.eot');
+    src: local('Farrerons Serif DemiBold'), local('FarreronsSerif-DemiBold'),
+        url('FarreronsSerif-DemiBold.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-DemiBold.woff2') format('woff2'),
+        url('FarreronsSerif-DemiBold.woff') format('woff'),
+        url('FarreronsSerif-DemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif.eot');
+    src: local('Farrerons Serif'), local('FarreronsSerif'),
+        url('FarreronsSerif.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif.woff2') format('woff2'),
+        url('FarreronsSerif.woff') format('woff'),
+        url('FarreronsSerif.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-DemiBoldItalic.eot');
+    src: local('Farrerons Serif DemiBold Italic'), local('FarreronsSerif-DemiBoldItalic'),
+        url('FarreronsSerif-DemiBoldItalic.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-DemiBoldItalic.woff2') format('woff2'),
+        url('FarreronsSerif-DemiBoldItalic.woff') format('woff'),
+        url('FarreronsSerif-DemiBoldItalic.ttf') format('truetype');
+    font-weight: 600;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-Italic.eot');
+    src: local('Farrerons Serif Italic'), local('FarreronsSerif-Italic'),
+        url('FarreronsSerif-Italic.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-Italic.woff2') format('woff2'),
+        url('FarreronsSerif-Italic.woff') format('woff'),
+        url('FarreronsSerif-Italic.ttf') format('truetype');
+    font-weight: normal;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-LightItalic.eot');
+    src: local('Farrerons Serif Light Italic'), local('FarreronsSerif-LightItalic'),
+        url('FarreronsSerif-LightItalic.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-LightItalic.woff2') format('woff2'),
+        url('FarreronsSerif-LightItalic.woff') format('woff'),
+        url('FarreronsSerif-LightItalic.ttf') format('truetype');
+    font-weight: 300;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-Bold.eot');
+    src: local('Farrerons Serif Bold'), local('FarreronsSerif-Bold'),
+        url('FarreronsSerif-Bold.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-Bold.woff2') format('woff2'),
+        url('FarreronsSerif-Bold.woff') format('woff'),
+        url('FarreronsSerif-Bold.ttf') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-Thin.eot');
+    src: local('Farrerons Serif Thin'), local('FarreronsSerif-Thin'),
+        url('FarreronsSerif-Thin.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-Thin.woff2') format('woff2'),
+        url('FarreronsSerif-Thin.woff') format('woff'),
+        url('FarreronsSerif-Thin.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-ThinItalic.eot');
+    src: local('Farrerons Serif Thin Italic'), local('FarreronsSerif-ThinItalic'),
+        url('FarreronsSerif-ThinItalic.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-ThinItalic.woff2') format('woff2'),
+        url('FarreronsSerif-ThinItalic.woff') format('woff'),
+        url('FarreronsSerif-ThinItalic.ttf') format('truetype');
+    font-weight: 100;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerif-BoldItalic.eot');
+    src: local('Farrerons Serif Bold Italic'), local('FarreronsSerif-BoldItalic'),
+        url('FarreronsSerif-BoldItalic.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerif-BoldItalic.woff2') format('woff2'),
+        url('FarreronsSerif-BoldItalic.woff') format('woff'),
+        url('FarreronsSerif-BoldItalic.ttf') format('truetype');
+    font-weight: bold;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Farrerons Serif';
+    src: url('FarreronsSerifLight.eot');
+    src: local('Farrerons Serif Light'), local('FarreronsSerifLight'),
+        url('FarreronsSerifLight.eot?#iefix') format('embedded-opentype'),
+        url('FarreronsSerifLight.woff2') format('woff2'),
+        url('FarreronsSerifLight.woff') format('woff'),
+        url('FarreronsSerifLight.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
