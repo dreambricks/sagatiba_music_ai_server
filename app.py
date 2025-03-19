@@ -43,6 +43,12 @@ for handler in logger.handlers:
         handler.flush()
 
 app = Flask(__name__)
+
+# Registrar rotas do Mongo
+app.register_blueprint(user_bp, url_prefix="/api")
+app.register_blueprint(audio_bp, url_prefix="/api")
+app.register_blueprint(task_bp, url_prefix="/api")
+
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 CORS(app)
 
@@ -316,10 +322,6 @@ def request_audio(json):
     # Responde ao WebSocket com os áudios encontrados
     emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': id}, namespace='/')
 
-# Registrar rotas do Mongo
-app.register_blueprint(user_bp, url_prefix="/api")
-app.register_blueprint(audio_bp, url_prefix="/api")
-app.register_blueprint(task_bp, url_prefix="/api")
 
 def enqueue_task(lyrics, lyrics_oid, phone):
     """ Adiciona uma tarefa à fila FIFO no Redis, armazenando um ID, a letra e o telefone do usuário """
@@ -390,6 +392,6 @@ def register_user_event(user_oid, action, lyrics_oid, audio_oid=None):
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
     if os.getenv('LOCAL_SERVER'):
-        socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
     else:
         socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
