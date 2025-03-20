@@ -32,6 +32,7 @@ def register_user():
     data = request.json
     email = data.get("email")
     password_hash = data.get("password_hash")
+    phone = data.get("phone")
     user_info_hash = data.get("user_info_hash")
 
     if not email or not password_hash or not user_info_hash:
@@ -45,6 +46,7 @@ def register_user():
     save_data = {
         "email": email,
         "password_hash": bcrypt.hashpw(password_hash.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+        "phone": phone,
         "user_info_hash": user_info_hash,
         "validated": False,
         "created_at": datetime.now(timezone.utc)
@@ -161,6 +163,7 @@ def login_user():
     token_payload = {
         "user_oid": str(user["_id"]),
         "email": email,
+        "phone": user.get("phone"),
         "exp": datetime.now(timezone.utc) + timedelta(hours=2)  # Expira em 2 horas
     }
     token = jwt.encode(token_payload, private_key, algorithm="ES256")
