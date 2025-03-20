@@ -321,18 +321,18 @@ def request_audio(json):
 
     logger.info(f"[SOCKET] Arquivos de áudio armazenados: {file_paths}")
 
-    # Envia SMS com o link de mensagem
-    message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={task_id}"
+    # # Envia SMS com o link de mensagem
+    # message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={task_id}"
 
-    try:
-        sms_sent = send_sms_download_message(message_url, phone)
-        if not sms_sent:
-            emit('error_message', {'error': 'Falha ao enviar SMS.', 'code': 502}, namespace='/')
-            return
-    except Exception as e:
-        logger.error(f"[SOCKET] Exceção ao enviar SMS: {e}")
-        emit('error_message', {'error': "Erro interno ao enviar SMS.", 'code': 500}, namespace='/')
-        return
+    # try:
+    #     sms_sent = send_sms_download_message(message_url, phone)
+    #     if not sms_sent:
+    #         emit('error_message', {'error': 'Falha ao enviar SMS.', 'code': 502}, namespace='/')
+    #         return
+    # except Exception as e:
+    #     logger.error(f"[SOCKET] Exceção ao enviar SMS: {e}")
+    #     emit('error_message', {'error': "Erro interno ao enviar SMS.", 'code': 500}, namespace='/')
+    #     return
 
     # Responde via WebSocket com as URLs dos áudios
     emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': task_id}, namespace='/')
