@@ -6,6 +6,7 @@ from schemas.generated_audios import GeneratedAudioSchema
 from schemas.worker_events import WorkerEventSchema
 from datetime import datetime, timezone
 import utils.db_util as db_util
+from utils.audio_util import apply_watermark_and_metadata
 from flask_socketio import emit
 from config.socket_config import socketio
 from utils.error_util import save_system_error
@@ -20,6 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 audio_bp = Blueprint("audio_bp", __name__)
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 @audio_bp.route("/audios/save_file", methods=["POST"])
 def save_generated_audio():
@@ -41,6 +44,18 @@ def save_generated_audio():
 
         if error1 or error2:
             return jsonify({"error": error1 or error2}), 400
+
+        logger.info(f"[PROCESS] Aplicando watermark nos arquivos: {file1_path}, {file2_path}")
+
+        watermark_path = os.path.join(BASE_DIR, "static", "watermark", "watermark_sagatiba.wav")
+        processed_audio_paths = []
+        for audio_path in [file1_path, file2_path]:
+            processed_audio = apply_watermark_and_metadata(audio_path, watermark_path)
+            logger.info(f"Processed audio: {processed_audio}")
+            processed_audio_paths.append(processed_audio)
+
+        # Atualize os paths com os processados
+        file1_path, file2_path = processed_audio_paths
 
         # URLs locais dos arquivos
         host_url = os.getenv("HOST_URL")
@@ -116,6 +131,18 @@ def save_generated_audio_from_url():
 
         if error1 or error2:
             return jsonify({"error": error1 or error2}), 400
+
+        logger.info(f"[PROCESS] Aplicando watermark nos arquivos: {file1_path}, {file2_path}")
+
+        watermark_path = os.path.join(BASE_DIR, "static", "watermark", "watermark_sagatiba.wav")
+        processed_audio_paths = []
+        for audio_path in [file1_path, file2_path]:
+            processed_audio = apply_watermark_and_metadata(audio_path, watermark_path)
+            logger.info(f"Processed audio: {processed_audio}")
+            processed_audio_paths.append(processed_audio)
+
+        # Atualize os paths com os processados
+        file1_path, file2_path = processed_audio_paths
 
         # URLs locais dos arquivos
         host_url = os.getenv("HOST_URL")

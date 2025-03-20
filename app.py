@@ -392,6 +392,6 @@ def register_user_event(user_oid, action, lyrics_oid, audio_oid=None):
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
     if os.getenv('LOCAL_SERVER'):
-        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, debug=True)
     else:
         socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))

@@ -283,3 +283,5 @@ pymongo==4.11.1
 flask_pymongo==3.0.1
 bson==0.5.10
 bcrypt==4.2.1
+future==1.0.0
+ffmpeg-python==0.2.0
