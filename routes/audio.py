@@ -115,7 +115,7 @@ def save_generated_audio_from_url():
     """Baixa arquivos de áudio de URLs, salva no servidor e registra a atividade do usuário."""
     data = request.json
     id = data.get("id")
-    phone = data.get("id")
+    phone = data.get("phone")
     worker_oid = data.get("worker_oid")
     lyrics_oid = data.get("lyrics_oid")
     audio_url1 = data.get("audio_url1")
