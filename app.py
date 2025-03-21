@@ -12,6 +12,7 @@ from flask_socketio import emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_mail import Mail
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from utils.openai_util import moderation_ok, generate_lyrics
 from utils.sms_util import send_sms_download_message, send_sms_message
@@ -43,6 +44,7 @@ for handler in logger.handlers:
         handler.flush()
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Registrar rotas do Mongo
 app.register_blueprint(user_bp, url_prefix="/api")
@@ -209,7 +211,7 @@ def generate_task_id():
         # Atualiza a fila no frontend via socket
         queue_items = task_db.lrange("lyrics_queue", 0, -1)
         queue_items = [json.loads(task.decode("utf-8")) for task in queue_items]
-        emit("queue_list", queue_items, namespace="/")
+        socketio.emit("queue_list", queue_items, namespace="/")
         logger.info(f"Queue updated after enqueue. Total: {len(queue_items)} items.")
 
         return jsonify({"status": "Sua tarefa foi enfileirada", "task_id": task_id}), 202
