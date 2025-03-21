@@ -209,7 +209,7 @@ def generate_task_id():
         # Atualiza a fila no frontend via socket
         queue_items = task_db.lrange("lyrics_queue", 0, -1)
         queue_items = [json.loads(task.decode("utf-8")) for task in queue_items]
-        socketio.emit("queue_list", queue_items, namespace="/")
+        emit("queue_list", queue_items, namespace="/")
         logger.info(f"Queue updated after enqueue. Total: {len(queue_items)} items.")
 
         return jsonify({"status": "Sua tarefa foi enfileirada", "task_id": task_id}), 202
@@ -277,7 +277,7 @@ def get_lyrics_and_audio():
 def send_queue():
     """Envia a lista atual da fila para o frontend."""
     queue_items = [json.loads(task.decode("utf-8")) for task in task_db.lrange("lyrics_queue", 0, -1)]
-    socketio.emit("queue_list", queue_items)
+    emit("queue_list", queue_items)
     logger.info(f"Queue sent to client. Total: {len(queue_items)} items.")
 
 @socketio.on('request_audio_url')
@@ -406,7 +406,8 @@ def register_user_event(user_oid, action, lyrics_oid, audio_oid=None):
 
 if __name__ == "__main__":
     logger.info("Starting Flask application...")
-    if os.getenv('LOCAL_SERVER'):
-        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, debug=True)
-    else:
-        socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
+    socketio.run(app, host='0.0.0.0', port=5001)
+    # if os.getenv('LOCAL_SERVER'):
+    #     socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, debug=True)
+    # else:
+    #     socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True, ssl_context=('priv/fullchain.pem', 'priv/privkey.pem'))
