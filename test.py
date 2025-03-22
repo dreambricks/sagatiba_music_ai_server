@@ -440,9 +440,11 @@ def test_manual_music_generation(lyrics):
 
 
 def test_fade_out():
-    input_mp3 = "static/mp3/sagatiba_5f9556aa-7a4a-497a-9a18-af3eb903b6ff.mp3"
-    output_mp3 = "static/mp3/sagatiba_fade_out.mp3"
-    audio_util.fade_out(input_mp3, output_mp3)
+    input_mp3 = "static/mp3/sagatiba_1742650250821.mp3"
+    #output_mp3 = "static/mp3/sagatiba_fade_out.mp3"
+    watermark_file = "static/watermark/watermark_sagatiba.wav"
+    #audio_util.fade_out(input_mp3, output_mp3)
+    audio_util.apply_watermark_and_metadata(input_mp3, watermark_file)
 
 
 if __name__ == "__main__":
