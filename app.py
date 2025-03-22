@@ -282,40 +282,38 @@ def send_queue():
     emit("queue_list", queue_items)
     logger.info(f"Queue sent to client. Total: {len(queue_items)} items.")
 
+from flask import request
+
 @socketio.on('request_audio_url')
 def request_audio(json):
-    """
-    Recebe uma requisição de áudio via WebSocket e envia o áudio para o número correto.
-    """
     logger.info(f"[SOCKET] Requisição recebida: {json}")
 
     task_id = json.get('task_id')
     phone = json.get('phone')
     host_url = os.getenv("HOST_URL")
+    sid = request.sid
 
-    # Validação de parâmetros
     if not task_id:
         logger.warning("[SOCKET] Requisição sem task_id.")
-        emit('error_message', {'error': 'Task Id é obrigatório', 'code': 400}, namespace='/')
+        emit('error_message', {'error': 'Task Id é obrigatório', 'code': 400}, to=sid)
         return
 
     if not phone:
         logger.warning("[SOCKET] Requisição sem número de telefone.")
-        emit('error_message', {'error': 'Telefone é obrigatório', 'code': 400}, namespace='/')
+        emit('error_message', {'error': 'Telefone é obrigatório', 'code': 400}, to=sid)
         return
 
     if not host_url:
         logger.error("[SOCKET] Variável de ambiente HOST_URL não está definida.")
-        emit('error_message', {'error': 'Erro interno de configuração.', 'code': 500}, namespace='/')
+        emit('error_message', {'error': 'Erro interno de configuração.', 'code': 500}, to=sid)
         return
 
-    # Busca o áudio no banco
     audio_entry = mongo.db.GeneratedAudios.find_one({"redis_id": task_id})
 
     if not audio_entry:
         logger.warning(f"[SOCKET] Nenhum áudio encontrado para id={task_id}")
         save_system_error("REQUEST_AUDIO", f"id_{task_id}", "Nenhum áudio encontrado para o ID fornecido.")
-        emit('error_message', {'error': "Nenhum áudio encontrado para o ID fornecido.", 'code': 404}, namespace='/')
+        emit('error_message', {'error': "Nenhum áudio encontrado para o ID fornecido.", 'code': 404}, to=sid)
         return
 
     file_paths = audio_entry.get("audio_urls", [])
@@ -323,21 +321,8 @@ def request_audio(json):
 
     logger.info(f"[SOCKET] Arquivos de áudio armazenados: {file_paths}")
 
-    # # Envia SMS com o link de mensagem
-    # message_url = f"https://seguenasaga.sagatiba.com/mensagem?task_id={task_id}"
+    emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': task_id}, to=sid)
 
-    # try:
-    #     sms_sent = send_sms_download_message(message_url, phone)
-    #     if not sms_sent:
-    #         emit('error_message', {'error': 'Falha ao enviar SMS.', 'code': 502}, namespace='/')
-    #         return
-    # except Exception as e:
-    #     logger.error(f"[SOCKET] Exceção ao enviar SMS: {e}")
-    #     emit('error_message', {'error': "Erro interno ao enviar SMS.", 'code': 500}, namespace='/')
-    #     return
-
-    # Responde via WebSocket com as URLs dos áudios
-    emit('audio_response', {'audio_urls': local_audio_urls, 'task_id': task_id}, namespace='/')
 
 
 def enqueue_task(lyrics, lyrics_oid, phone):
