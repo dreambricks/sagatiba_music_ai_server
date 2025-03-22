@@ -2,6 +2,7 @@ from pydub import AudioSegment
 import subprocess
 import os
 import logging
+import parameters as param
 
 # Configuração do logger
 logger = logging.getLogger(__name__)
@@ -45,9 +46,9 @@ def apply_watermark_and_metadata(input_audio_path, watermark_path):
             "ffprobe", "-v", "error", "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1", input_audio_path
         ]
-        duration_output = subprocess.check_output(cmd_duration).decode().strip()
-        duration_seconds = float(duration_output)
-        fade_duration = 2
+        duration_output = min(float(subprocess.check_output(cmd_duration).decode().strip()), param.MAX_SONG_DURATION)
+        duration_seconds = duration_output
+        fade_duration = param.SONG_FADE_OUT_DURATION
         fade_out_start = duration_seconds - fade_duration
 
         # Comando FFmpeg
@@ -64,6 +65,7 @@ def apply_watermark_and_metadata(input_audio_path, watermark_path):
             "-metadata", "comment=Compartilhe livremente, mas uso comercial é proibido. Saiba mais em: https://seguenasaga.sagatiba.com",
             "-metadata", "encoded_by=https://seguenasaga.sagatiba.com",
             "-metadata", "copyright_flag=1",
+            "-t", f"{duration_output}",
             "-b:a", "192k", "-ar", "48000", "-y", output_audio_path
         ]
 
