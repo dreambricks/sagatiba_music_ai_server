@@ -21,10 +21,12 @@ from utils.error_util import save_system_error
 from config.mongo_config import mongo, init_mongo
 from config.socket_config import socketio
 from schemas.user_events import UserEventSchema
+from schemas.generated_lyrics import GeneratedLyricsSchema
 
 from routes.user import user_bp
 from routes.audio import audio_bp
 from routes.tasks import task_bp
+
 
 # Configuração de logging
 logging.basicConfig(
@@ -107,6 +109,7 @@ def health_check():
     logger.info("Alive check endpoint accessed.")
     return jsonify({"status": "healthy"}), 200
 
+
 @app.route("/check/status", methods=["GET"])
 def check_system_status():
     """
@@ -135,12 +138,12 @@ def check_system_status():
             "timestamp": error_data["timestamp"]
         })
 
-
     return jsonify({
         "status": "error",
         "message": "I've got a bad feeling about this...",
         "errors": error_list
     }), 500
+
 
 @app.route("/lyrics", methods=["POST"])
 #@limiter.limit("1 per 5 minutes")
@@ -161,7 +164,20 @@ def call_generate_lyrics():
     is_ok, error_msg = moderation_ok(destination, message)
     if is_ok:
         lyrics_path = "static/lyrics"
-        lyrics, lyrics_oid = generate_lyrics(destination, invite_options, weekdays, message, user_oid, lyrics_path)
+        lyrics = generate_lyrics(destination, invite_options, weekdays, message, lyrics_path)
+
+        # Salvar a letra gerada no banco de dados
+        lyrics_data = {
+            "lyrics": lyrics,
+            "user_oid": user_oid,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        lyrics_entry = GeneratedLyricsSchema(**lyrics_data)
+        result = mongo.db.GeneratedLyrics.insert_one(lyrics_entry.model_dump())
+
+        # ID do documento salvo
+        lyrics_oid = str(result.inserted_id)
+
         register_user_event(user_oid, "lyrics_processing", lyrics_oid)
 
         logger.info("Lyrics generated successfully.")
@@ -170,6 +186,7 @@ def call_generate_lyrics():
     else:
         logger.warning("Submitted text violates moderation rules.")
         return jsonify({"error": f"Erro o texto submetido viola as regras de moderação: {error_msg}"}), 403
+
 
 @app.route("/lyrics/generate", methods=["POST"])
 def generate_task_id():
@@ -225,7 +242,7 @@ def generate_task_id():
 def get_lyrics_and_audio():
     """Retorna as letras da música e os arquivos de áudio associados ao id."""
     id = request.args.get("task_id")
-    host_url = os.getenv("HOST_URL")
+    host_url = "localhost" if os.getenv("LOCAL_SERVER") else os.getenv("HOST_URL")
 
     if not id:
         return jsonify({"error": "O Id é obrigatório."}), 400
