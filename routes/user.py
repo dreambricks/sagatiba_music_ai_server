@@ -225,6 +225,15 @@ def reset_password(token):
 
     except Exception as e:
         return jsonify({"error": f"Erro ao processar a recuperação de senha: {str(e)}"}), 400
+    
+@user_bp.route('/users/ip', methods=['GET'])
+def get_user_ip():
+    if request.headers.getlist("X-Forwarded-For"):
+        ip = request.headers.getlist("X-Forwarded-For")[0]
+    else:
+        ip = request.remote_addr
+
+    return jsonify({'ip': ip})
 
 @user_bp.route("/users/worker/register", methods=["POST"])
 def register_worker():
